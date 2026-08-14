@@ -41,6 +41,26 @@ export default function PublicAgendarPage() {
     
     setSaving(true);
     try {
+      // 1. CONFLICT CHECK: Verify if there's an event on the same date and time
+      const { data: conflicts, error: conflictError } = await supabase
+        .from('events')
+        .select('id, title, start_time')
+        .eq('date', date)
+        .neq('status', 'cancelled');
+        
+      if (conflictError) throw conflictError;
+
+      // Check if any event is close in time (e.g. same hour or within 2 hours)
+      // For simplicity, let's just warn if it's the exact same time
+      const exactConflict = conflicts?.find(c => c.start_time.substring(0, 5) === startTime);
+      
+      if (exactConflict) {
+        if (!confirm(`⚠️ Atenção: Já existe um evento ("${exactConflict.title}") agendado para o mesmo dia às ${startTime}. Deseja agendar neste horário mesmo assim? (Pode ser em outro local da igreja)`)) {
+          setSaving(false);
+          return;
+        }
+      }
+
       const payload = {
         title: title.trim(),
         date: date,
