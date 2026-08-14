@@ -166,6 +166,32 @@ export default async function PublicAgendaPage() {
           </div>
         )}
       </main>
+
+      {/* Floating Action Button para Agendar */}
+      <Link 
+        href="/agendar" 
+        style={{
+          position: 'fixed',
+          bottom: 'var(--space-6)',
+          right: 'var(--space-6)',
+          backgroundColor: 'var(--primary)',
+          color: 'white',
+          padding: 'var(--space-3) var(--space-4)',
+          borderRadius: 'var(--radius-full)',
+          boxShadow: '0 4px 12px rgba(79, 70, 229, 0.4)',
+          textDecoration: 'none',
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-2)',
+          zIndex: 20,
+          transition: 'transform 0.2s',
+        }}
+        onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+        onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+      >
+        <span style={{ fontSize: '1.2rem' }}>+</span> Agendar Evento
+      </Link>
     </div>
   );
 }
