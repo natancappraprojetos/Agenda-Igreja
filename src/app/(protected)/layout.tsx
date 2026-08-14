@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AuthProvider } from '@/lib/hooks/useAuth';
+
 import { ToastProvider } from '@/lib/hooks/useToast';
 import Sidebar from '@/components/layout/Sidebar';
 import MobileNav from '@/components/layout/MobileNav';
@@ -14,7 +14,6 @@ export default function ProtectedLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <AuthProvider>
         <div className="app-layout">
           <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
           <main className="app-main">
@@ -22,6 +21,5 @@ export default function ProtectedLayout({
           </main>
           <MobileNav />
         </div>
-    </AuthProvider>
   );
 }

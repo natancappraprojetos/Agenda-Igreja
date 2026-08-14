@@ -162,8 +162,8 @@ export default function PublicAgendarWizard() {
             <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => window.location.reload()}>
               Novo Agendamento
             </button>
-            <Link href="/agenda" className="btn btn-secondary" style={{ flex: 1, textDecoration: 'none' }}>
-              Ir para Agenda Interna
+            <Link href="/" className="btn btn-secondary" style={{ flex: 1, textDecoration: 'none' }}>
+              Ver Agenda
             </Link>
           </div>
         </div>

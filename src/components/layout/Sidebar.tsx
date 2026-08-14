@@ -10,7 +10,7 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { href: '/agenda', icon: '📅', label: 'Agenda' },
+  { href: '/', icon: '📅', label: 'Agenda Geral' },
   { href: '/minha-agenda', icon: '👤', label: 'Minha Agenda' },
   { href: '/eventos/novo', icon: '➕', label: 'Novo Evento' },
   { href: '/pendencias', icon: '⚠️', label: 'Pendências' },
@@ -38,7 +38,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { person, roles, isAdmin, isLeadership, signOut } = useAuth();
 
   const isActive = (href: string) => {
-    if (href === '/agenda') return pathname === '/agenda';
+    if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
   };
 

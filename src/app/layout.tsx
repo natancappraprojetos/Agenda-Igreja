@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { ToastProvider } from '@/lib/hooks/useToast';
+import { AuthProvider } from '@/lib/hooks/useAuth';
 
 export const metadata: Metadata = {
   title: 'Central Santo Afonso',
@@ -15,9 +16,11 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body>
-        <ToastProvider>
-          {children}
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );

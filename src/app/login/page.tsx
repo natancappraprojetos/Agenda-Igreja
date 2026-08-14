@@ -32,7 +32,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push('/agenda');
+      router.push('/admin');
       router.refresh();
     } catch {
       setError('Erro de conexão. Verifique sua internet.');
