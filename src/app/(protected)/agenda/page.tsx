@@ -14,7 +14,7 @@ import {
 import { formatTime } from '@/lib/utils/liturgy-calculator';
 
 export default function AgendaPage() {
-  const [view, setView] = useState<CalendarView>('week');
+  const [view, setView] = useState<CalendarView>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<ChurchEvent[]>([]);
   const [loading, setLoading] = useState(true);

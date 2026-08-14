@@ -15,7 +15,6 @@ export default function ProtectedLayout({
 
   return (
     <AuthProvider>
-      <ToastProvider>
         <div className="app-layout">
           <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
           <main className="app-main">
@@ -23,7 +22,6 @@ export default function ProtectedLayout({
           </main>
           <MobileNav />
         </div>
-      </ToastProvider>
     </AuthProvider>
   );
 }
