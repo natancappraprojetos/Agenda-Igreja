@@ -43,13 +43,31 @@ export interface PersonRole {
 export interface Ministry {
   id: string;
   name: string;
-  description: string | null;
-  color: string;
+  icon?: string;
+  color?: string;
+  description?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
   // Joined
   members?: PersonMinistry[];
+}
+
+export interface EventNeedType {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface EventNeed {
+  id: string;
+  event_id: string;
+  need_type_id: string;
+  notes?: string;
+  need_type?: EventNeedType;
 }
 
 export interface PersonMinistry {

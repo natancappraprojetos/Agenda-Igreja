@@ -21,13 +21,14 @@ function NovoEventoWizard() {
   const supabase = createClient();
   const { addToast } = useToast();
 
-  // Reference data
+  // Reference Data
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [ministries, setMinistries] = useState<Ministry[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
+  const [needTypes, setNeedTypes] = useState<any[]>([]);
 
-  // Form data
+  // Form Data
   const [eventTypeId, setEventTypeId] = useState('');
   const [title, setTitle] = useState('');
   const searchParams = useSearchParams();
@@ -36,31 +37,32 @@ function NovoEventoWizard() {
   const [endTime, setEndTime] = useState('');
   const [locationId, setLocationId] = useState('');
   const [ministryId, setMinistryId] = useState('');
+  const [selectedNeeds, setSelectedNeeds] = useState<string[]>([]);
   const [responsibleId, setResponsibleId] = useState('');
   const [preacherId, setPreacherId] = useState('');
   const [worshipLeaderId, setWorshipLeaderId] = useState('');
-  const [needsSound, setNeedsSound] = useState(false);
   const [soundPersonId, setSoundPersonId] = useState('');
-  const [needsDeaconry, setNeedsDeaconry] = useState(false);
-  const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
+  const [description, setDescription] = useState('');
 
   // Conflicts
-  const [locationConflicts, setLocationConflicts] = useState<Array<{ event_id: string; event_title: string; event_start_time: string; event_end_time: string }>>([]);
-  const [personConflicts, setPersonConflicts] = useState<Array<{ person: string; event_title: string; event_start_time: string }>>([]);
+  const [locationConflicts, setLocationConflicts] = useState<Array<any>>([]);
+  const [personConflicts, setPersonConflicts] = useState<Array<any>>([]);
 
   const fetchReferenceData = useCallback(async () => {
     setLoading(true);
-    const [types, locs, mins, ppl] = await Promise.all([
+    const [types, locs, mins, needsData, ppl] = await Promise.all([
       supabase.from('event_types').select('*').eq('is_active', true).order('sort_order'),
       supabase.from('locations').select('*').eq('is_active', true).order('name'),
       supabase.from('ministries').select('*').eq('is_active', true).order('name'),
-      supabase.from('people').select('*').eq('is_active', true).order('name'),
+      supabase.from('event_needs_types').select('*').eq('is_active', true).order('name'),
+      supabase.from('people').select('*').eq('is_active', true).order('name')
     ]);
-    setEventTypes((types.data || []) as EventType[]);
-    setLocations((locs.data || []) as Location[]);
-    setMinistries((mins.data || []) as Ministry[]);
-    setPeople((ppl.data || []) as Person[]);
+    if (types.data) setEventTypes(types.data as EventType[]);
+    if (locs.data) setLocations(locs.data as Location[]);
+    if (mins.data) setMinistries(mins.data as Ministry[]);
+    if (needsData.data) setNeedTypes(needsData.data);
+    if (ppl.data) setPeople(ppl.data as Person[]);
     setLoading(false);
   }, [supabase]);
 
@@ -91,8 +93,8 @@ function NovoEventoWizard() {
   const canProceed = () => {
     switch (step) {
       case 1: return !!eventTypeId;
-      case 2: return !!date && !!startTime;
-      case 3: return true; // location is optional
+      case 2: return !!date && !!startTime && !!title;
+      case 3: return locationConflicts.length === 0; // location optional but blocks if conflict
       case 4: return true; // ministry is optional
       case 5: return true; // people are optional
       case 6: return true; // needs are optional
@@ -105,34 +107,41 @@ function NovoEventoWizard() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { data, error } = await supabase.from('events').insert({
-        title,
+      const payload = {
+        title: title.trim(),
         event_type_id: eventTypeId,
-        date,
+        date: date,
         start_time: startTime,
         end_time: endTime || null,
         location_id: locationId || null,
         ministry_id: ministryId || null,
-        responsible_person_id: responsibleId || null,
         preacher_id: preacherId || null,
         worship_leader_id: worshipLeaderId || null,
-        needs_sound: needsSound,
         sound_person_id: soundPersonId || null,
-        needs_worship: !!worshipLeaderId,
-        needs_deaconry: needsDeaconry,
-        description: description || null,
-        notes: notes || null,
-        status: 'scheduled',
-      }).select().single();
+        responsible_person_id: responsibleId || null,
+        notes: notes.trim() || null,
+        description: description.trim() || null,
+        status: 'scheduled'
+      };
 
+      const { data: insertedEvent, error } = await supabase.from('events').insert(payload).select().single();
+      
       if (error) throw error;
+      
+      if (selectedNeeds.length > 0 && insertedEvent) {
+        const needsPayload = selectedNeeds.map(needId => ({
+          event_id: insertedEvent.id,
+          need_type_id: needId
+        }));
+        await supabase.from('event_needs').insert(needsPayload);
+      }
 
       // Create schedule entries for assigned people
       const scheduleEntries = [];
-      if (preacherId) scheduleEntries.push({ event_id: data.id, person_id: preacherId, date, start_time: startTime, end_time: endTime || null });
-      if (worshipLeaderId) scheduleEntries.push({ event_id: data.id, person_id: worshipLeaderId, date, start_time: startTime, end_time: endTime || null });
-      if (soundPersonId) scheduleEntries.push({ event_id: data.id, person_id: soundPersonId, date, start_time: startTime, end_time: endTime || null });
-      if (responsibleId) scheduleEntries.push({ event_id: data.id, person_id: responsibleId, date, start_time: startTime, end_time: endTime || null });
+      if (preacherId) scheduleEntries.push({ event_id: insertedEvent.id, person_id: preacherId, date, start_time: startTime, end_time: endTime || null });
+      if (worshipLeaderId) scheduleEntries.push({ event_id: insertedEvent.id, person_id: worshipLeaderId, date, start_time: startTime, end_time: endTime || null });
+      if (soundPersonId) scheduleEntries.push({ event_id: insertedEvent.id, person_id: soundPersonId, date, start_time: startTime, end_time: endTime || null });
+      if (responsibleId) scheduleEntries.push({ event_id: insertedEvent.id, person_id: responsibleId, date, start_time: startTime, end_time: endTime || null });
 
       if (scheduleEntries.length > 0) {
         await supabase.from('schedules').insert(scheduleEntries);
@@ -199,7 +208,10 @@ function NovoEventoWizard() {
                   <div
                     key={type.id}
                     className={`wizard-option ${eventTypeId === type.id ? 'selected' : ''}`}
-                    onClick={() => setEventTypeId(type.id)}
+                    onClick={() => {
+                      setEventTypeId(type.id);
+                      setTimeout(() => setStep(2), 200);
+                    }}
                   >
                     <span className="wizard-option-icon">{type.icon}</span>
                     <span className="wizard-option-label">{type.name}</span>
@@ -272,7 +284,7 @@ function NovoEventoWizard() {
                 <div className="conflict-alert mt-4">
                   <span className="conflict-alert-icon">⚠️</span>
                   <div>
-                    <div className="conflict-alert-title">Conflito de local!</div>
+                    <div className="conflict-alert-title">Já existe um evento agendado neste local e horário:</div>
                     {locationConflicts.map((c, i) => (
                       <div key={i} className="conflict-alert-message">
                         {c.event_title} — {c.event_start_time?.substring(0, 5)}
@@ -290,12 +302,24 @@ function NovoEventoWizard() {
             <div className="wizard-step">
               <h2 className="wizard-step-title">Qual ministério?</h2>
               <p className="wizard-step-subtitle">Selecione o ministério responsável (opcional)</p>
-              <SearchSelect
-                options={ministryOptions}
-                value={ministryId}
-                onChange={setMinistryId}
-                placeholder="Buscar ministério..."
-              />
+              <div className="wizard-options list-mode">
+                <div className={`wizard-option ${ministryId === '' ? 'selected' : ''}`} onClick={() => {
+                  setMinistryId('');
+                  setTimeout(() => setStep(5), 200);
+                }}>
+                  <span className="wizard-option-icon">🌐</span>
+                  <span className="wizard-option-label">Geral / Toda a Igreja</span>
+                </div>
+                {ministries.map(m => (
+                  <div key={m.id} className={`wizard-option ${ministryId === m.id ? 'selected' : ''}`} onClick={() => {
+                    setMinistryId(m.id);
+                    setTimeout(() => setStep(5), 200);
+                  }}>
+                    <span className="wizard-option-icon">{m.icon || '🏛️'}</span>
+                    <span className="wizard-option-label">{m.name}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -340,42 +364,26 @@ function NovoEventoWizard() {
               <h2 className="wizard-step-title">Necessidades do evento</h2>
               <p className="wizard-step-subtitle">Configure o que o evento precisa</p>
 
-              <div className="form-checkbox-group">
-                <input
-                  type="checkbox"
-                  id="needs_sound"
-                  className="form-checkbox"
-                  checked={needsSound}
-                  onChange={e => setNeedsSound(e.target.checked)}
-                />
-                <label htmlFor="needs_sound" className="form-checkbox-label">
-                  🔊 Precisa de sonoplastia
-                </label>
-              </div>
-
-              {needsSound && (
-                <div className="form-group" style={{ marginLeft: 'var(--space-8)' }}>
-                  <label className="form-label">Responsável pela Sonoplastia</label>
-                  <PersonSelect
-                    value={soundPersonId}
-                    onChange={setSoundPersonId}
-                    placeholder="Buscar ou cadastrar..."
+              {needTypes.map(need => (
+                <div key={need.id} className="form-checkbox-group" style={{ marginBottom: 'var(--space-2)' }}>
+                  <input 
+                    type="checkbox" 
+                    id={`need_${need.id}`} 
+                    className="form-checkbox" 
+                    checked={selectedNeeds.includes(need.id)} 
+                    onChange={e => {
+                      if (e.target.checked) setSelectedNeeds([...selectedNeeds, need.id]);
+                      else setSelectedNeeds(selectedNeeds.filter(id => id !== need.id));
+                    }} 
                   />
+                  <label htmlFor={`need_${need.id}`} className="form-checkbox-label">
+                    {need.icon} Precisa de {need.name}
+                  </label>
                 </div>
+              ))}
+              {needTypes.length === 0 && (
+                <p style={{ color: 'var(--text-secondary)' }}>Nenhuma necessidade especial cadastrada.</p>
               )}
-
-              <div className="form-checkbox-group">
-                <input
-                  type="checkbox"
-                  id="needs_deaconry"
-                  className="form-checkbox"
-                  checked={needsDeaconry}
-                  onChange={e => setNeedsDeaconry(e.target.checked)}
-                />
-                <label htmlFor="needs_deaconry" className="form-checkbox-label">
-                  👔 Precisa de diaconato
-                </label>
-              </div>
             </div>
           )}
 
@@ -480,8 +488,10 @@ function NovoEventoWizard() {
                 )}
 
                 <div style={{ marginTop: 'var(--space-4)', display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                  {needsSound && <span className="badge badge-info">🔊 Sonoplastia</span>}
-                  {needsDeaconry && <span className="badge badge-info">👔 Diaconato</span>}
+                  {selectedNeeds.map(needId => {
+                    const need = needTypes.find(n => n.id === needId);
+                    return need ? <span key={need.id} className="badge badge-info">{need.icon} {need.name}</span> : null;
+                  })}
                 </div>
               </div>
 

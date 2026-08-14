@@ -63,7 +63,7 @@ export default async function PublicAgendaPage() {
             AI
           </div>
           <h1 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-            Agenda Igreja
+            Central Santo Afonso
           </h1>
         </div>
         <Link href="/login" className="btn btn-ghost btn-sm" style={{ fontWeight: 600 }}>

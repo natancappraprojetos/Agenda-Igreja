@@ -107,6 +107,32 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             Notificações
           </Link>
 
+          <div className="sidebar-group">
+            <h3 className="sidebar-group-title">Configurações</h3>
+            <nav className="sidebar-nav">
+              <Link href="/admin/tipos-evento" className={`sidebar-link ${pathname === '/admin/tipos-evento' ? 'active' : ''}`} onClick={onClose}>
+                <span className="sidebar-icon">🏷️</span>
+                Tipos de Evento
+              </Link>
+              <Link href="/admin/ministerios" className={`sidebar-link ${pathname === '/admin/ministerios' ? 'active' : ''}`} onClick={onClose}>
+                <span className="sidebar-icon">🏛️</span>
+                Ministérios
+              </Link>
+              <Link href="/admin/necessidades" className={`sidebar-link ${pathname === '/admin/necessidades' ? 'active' : ''}`} onClick={onClose}>
+                <span className="sidebar-icon">📋</span>
+                Necessidades
+              </Link>
+              <Link href="/admin/liturgia-item-tipos" className={`sidebar-link ${pathname === '/admin/liturgia-item-tipos' ? 'active' : ''}`} onClick={onClose}>
+                <span className="sidebar-icon">📜</span>
+                Tipos de Liturgia
+              </Link>
+              <Link href="/admin/usuarios" className={`sidebar-link ${pathname === '/admin/usuarios' ? 'active' : ''}`} onClick={onClose}>
+                <span className="sidebar-icon">👥</span>
+                Usuários
+              </Link>
+            </nav>
+          </div>
+
           {(isAdmin || isLeadership) && (
             <>
               <div className="sidebar-section">

@@ -3,8 +3,8 @@ import './globals.css';
 import { ToastProvider } from '@/lib/hooks/useToast';
 
 export const metadata: Metadata = {
-  title: 'Agenda Igreja — Sistema de Gerenciamento',
-  description: 'Sistema de gerenciamento de programação, agenda, escalas e liturgias da igreja.',
+  title: 'Central Santo Afonso',
+  description: 'Sistema de gerenciamento de programação da Igreja Santo Afonso.',
 };
 
 export default function RootLayout({

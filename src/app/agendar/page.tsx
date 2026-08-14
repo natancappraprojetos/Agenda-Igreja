@@ -21,6 +21,8 @@ export default function PublicAgendarWizard() {
   const [eventTypes, setEventTypes] = useState<EventType[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [ministries, setMinistries] = useState<Ministry[]>([]);
+  const [needTypes, setNeedTypes] = useState<any[]>([]);
+  const [people, setPeople] = useState<any[]>([]);
 
   // Form Data
   const [eventTypeId, setEventTypeId] = useState('');
@@ -30,8 +32,8 @@ export default function PublicAgendarWizard() {
   const [endTime, setEndTime] = useState('');
   const [locationId, setLocationId] = useState('');
   const [ministryId, setMinistryId] = useState('');
-  const [needsSound, setNeedsSound] = useState(false);
-  const [needsDeaconry, setNeedsDeaconry] = useState(false);
+  const [selectedNeeds, setSelectedNeeds] = useState<string[]>([]);
+  const [solicitanteId, setSolicitanteId] = useState('');
   const [solicitante, setSolicitante] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -40,14 +42,18 @@ export default function PublicAgendarWizard() {
 
   const fetchReferenceData = useCallback(async () => {
     setLoading(true);
-    const [types, locs, mins] = await Promise.all([
+    const [types, locs, mins, needsData, ppl] = await Promise.all([
       supabase.from('event_types').select('*').eq('is_active', true).order('sort_order'),
       supabase.from('locations').select('*').eq('is_active', true).order('name'),
-      supabase.from('ministries').select('*').eq('is_active', true).order('name')
+      supabase.from('ministries').select('*').eq('is_active', true).order('name'),
+      supabase.from('event_needs_types').select('*').eq('is_active', true).order('name'),
+      supabase.from('people').select('id, name').eq('is_active', true).order('name')
     ]);
     if (types.data) setEventTypes(types.data as EventType[]);
     if (locs.data) setLocations(locs.data as Location[]);
     if (mins.data) setMinistries(mins.data as Ministry[]);
+    if (needsData.data) setNeedTypes(needsData.data);
+    if (ppl.data) setPeople(ppl.data);
     setLoading(false);
   }, [supabase]);
 
@@ -79,10 +85,10 @@ export default function PublicAgendarWizard() {
     switch (step) {
       case 1: return !!eventTypeId;
       case 2: return !!date && !!startTime && !!title;
-      case 3: return true; // location optional
+      case 3: return locationConflicts.length === 0; // location optional but blocks if conflict
       case 4: return true; // ministry optional
       case 5: return true; // needs optional
-      case 6: return !!solicitante.trim(); // identificação mandatory
+      case 6: return solicitanteId === 'outro' ? !!solicitante.trim() : !!solicitanteId; // identificação mandatory
       case 7: return true; // review
       default: return false;
     }
@@ -108,6 +114,8 @@ export default function PublicAgendarWizard() {
         }
       }
 
+      const personName = solicitanteId === 'outro' ? solicitante.trim() : (people.find(p => p.id === solicitanteId)?.name || solicitante.trim());
+      
       const payload = {
         title: title.trim(),
         event_type_id: eventTypeId,
@@ -116,15 +124,22 @@ export default function PublicAgendarWizard() {
         end_time: endTime || null,
         location_id: locationId || null,
         ministry_id: ministryId || null,
-        needs_sound: needsSound,
-        needs_deaconry: needsDeaconry,
-        description: `Solicitado por: ${solicitante.trim()}`,
+        description: `Solicitado por: ${personName}`,
         notes: notes.trim() || null,
         status: 'scheduled'
       };
 
-      const { error } = await supabase.from('events').insert(payload);
+      const { data: insertedEvent, error } = await supabase.from('events').insert(payload).select().single();
       if (error) throw error;
+
+      if (selectedNeeds.length > 0 && insertedEvent) {
+        const needsPayload = selectedNeeds.map(needId => ({
+          event_id: insertedEvent.id,
+          need_type_id: needId
+        }));
+        await supabase.from('event_needs').insert(needsPayload);
+      }
+      
       setSuccess(true);
     } catch (err) {
       console.error(err);
@@ -143,9 +158,14 @@ export default function PublicAgendarWizard() {
           <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-6)' }}>
             Seu evento foi adicionado à agenda da igreja. A liderança poderá revisar e ajustar os detalhes, se necessário.
           </p>
-          <Link href="/" className="btn btn-primary" style={{ display: 'block', width: '100%', textDecoration: 'none' }}>
-            Voltar para a Agenda
-          </Link>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => window.location.reload()}>
+              Novo Agendamento
+            </button>
+            <Link href="/agenda" className="btn btn-secondary" style={{ flex: 1, textDecoration: 'none' }}>
+              Ir para Agenda Interna
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -188,7 +208,10 @@ export default function PublicAgendarWizard() {
                 <h2 className="wizard-step-title">Qual tipo de evento?</h2>
                 <div className="wizard-options">
                   {eventTypes.map(type => (
-                    <div key={type.id} className={`wizard-option ${eventTypeId === type.id ? 'selected' : ''}`} onClick={() => setEventTypeId(type.id)}>
+                    <div key={type.id} className={`wizard-option ${eventTypeId === type.id ? 'selected' : ''}`} onClick={() => {
+                      setEventTypeId(type.id);
+                      setTimeout(() => setStep(2), 200);
+                    }}>
                       <span className="wizard-option-icon">{type.icon}</span>
                       <span className="wizard-option-label">{type.name}</span>
                     </div>
@@ -234,7 +257,7 @@ export default function PublicAgendarWizard() {
                   <div className="conflict-alert mt-4">
                     <span className="conflict-alert-icon">⚠️</span>
                     <div>
-                      <div className="conflict-alert-title">Conflito de local!</div>
+                      <div className="conflict-alert-title">Já existe um evento agendado neste local e horário:</div>
                       {locationConflicts.map((c, i) => (
                         <div key={i} className="conflict-alert-message">
                           {c.event_title} — {c.event_start_time?.substring(0, 5)}
@@ -251,10 +274,24 @@ export default function PublicAgendarWizard() {
               <div className="wizard-step">
                 <h2 className="wizard-step-title">Qual ministério?</h2>
                 <p className="wizard-step-subtitle">De qual ministério é este evento? (Opcional)</p>
-                <select className="form-input" value={ministryId} onChange={e => setMinistryId(e.target.value)} size={6} style={{ height: 'auto' }}>
-                  <option value="">Geral / Toda a Igreja</option>
-                  {ministries.map(m => <option key={m.id} value={m.id} style={{ padding: '8px' }}>🏛️ {m.name}</option>)}
-                </select>
+                <div className="wizard-options list-mode">
+                  <div className={`wizard-option ${ministryId === '' ? 'selected' : ''}`} onClick={() => {
+                    setMinistryId('');
+                    setTimeout(() => setStep(5), 200);
+                  }}>
+                    <span className="wizard-option-icon">🌐</span>
+                    <span className="wizard-option-label">Geral / Toda a Igreja</span>
+                  </div>
+                  {ministries.map(m => (
+                    <div key={m.id} className={`wizard-option ${ministryId === m.id ? 'selected' : ''}`} onClick={() => {
+                      setMinistryId(m.id);
+                      setTimeout(() => setStep(5), 200);
+                    }}>
+                      <span className="wizard-option-icon">{m.icon || '🏛️'}</span>
+                      <span className="wizard-option-label">{m.name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -263,14 +300,26 @@ export default function PublicAgendarWizard() {
               <div className="wizard-step">
                 <h2 className="wizard-step-title">Necessidades</h2>
                 <p className="wizard-step-subtitle">Marque o que o evento precisará</p>
-                <div className="form-checkbox-group">
-                  <input type="checkbox" id="needs_sound" className="form-checkbox" checked={needsSound} onChange={e => setNeedsSound(e.target.checked)} />
-                  <label htmlFor="needs_sound" className="form-checkbox-label">🔊 Precisa de equipe de Sonoplastia/Mídia</label>
-                </div>
-                <div className="form-checkbox-group">
-                  <input type="checkbox" id="needs_deaconry" className="form-checkbox" checked={needsDeaconry} onChange={e => setNeedsDeaconry(e.target.checked)} />
-                  <label htmlFor="needs_deaconry" className="form-checkbox-label">👔 Precisa de equipe de Diaconato (Recepção)</label>
-                </div>
+                {needTypes.map(need => (
+                  <div key={need.id} className="form-checkbox-group" style={{ marginBottom: 'var(--space-2)' }}>
+                    <input 
+                      type="checkbox" 
+                      id={`need_${need.id}`} 
+                      className="form-checkbox" 
+                      checked={selectedNeeds.includes(need.id)} 
+                      onChange={e => {
+                        if (e.target.checked) setSelectedNeeds([...selectedNeeds, need.id]);
+                        else setSelectedNeeds(selectedNeeds.filter(id => id !== need.id));
+                      }} 
+                    />
+                    <label htmlFor={`need_${need.id}`} className="form-checkbox-label">
+                      {need.icon} Precisa de {need.name}
+                    </label>
+                  </div>
+                ))}
+                {needTypes.length === 0 && (
+                  <p style={{ color: 'var(--text-secondary)' }}>Nenhuma necessidade especial cadastrada.</p>
+                )}
               </div>
             )}
 
@@ -281,9 +330,22 @@ export default function PublicAgendarWizard() {
                 <p className="wizard-step-subtitle">Quem está solicitando este agendamento?</p>
                 <div className="form-group">
                   <label className="form-label">Seu Nome / Cargo *</label>
-                  <input type="text" className="form-input" value={solicitante} onChange={e => setSolicitante(e.target.value)} placeholder="Ex: Irmã Maria (Diaconato)" />
+                  <select className="form-input" value={solicitanteId} onChange={e => {
+                    setSolicitanteId(e.target.value);
+                    if (e.target.value !== 'outro') setSolicitante('');
+                  }}>
+                    <option value="">Selecione quem você é...</option>
+                    {people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    <option value="outro">Outro (Não estou na lista)</option>
+                  </select>
                 </div>
-                <div className="form-group">
+                {solicitanteId === 'outro' && (
+                  <div className="form-group" style={{ marginTop: 'var(--space-4)' }}>
+                    <label className="form-label">Digite seu nome completo *</label>
+                    <input type="text" className="form-input" value={solicitante} onChange={e => setSolicitante(e.target.value)} placeholder="Ex: Irmã Maria (Diaconato)" autoFocus />
+                  </div>
+                )}
+                <div className="form-group" style={{ marginTop: 'var(--space-4)' }}>
                   <label className="form-label">Observações Internas (opcional)</label>
                   <textarea className="form-textarea" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Detalhes adicionais para a liderança avaliar..." />
                 </div>
@@ -301,11 +363,13 @@ export default function PublicAgendarWizard() {
                     <div className="review-section"><div className="review-label">Data e Hora</div><div className="review-value">{date} às {startTime}</div></div>
                     {locationId && <div className="review-section"><div className="review-label">📍 Local</div><div className="review-value">{getLocationName(locationId)}</div></div>}
                     {ministryId && <div className="review-section"><div className="review-label">🏛️ Ministério</div><div className="review-value">{getMinistryName(ministryId)}</div></div>}
-                    <div className="review-section"><div className="review-label">👤 Solicitante</div><div className="review-value">{solicitante}</div></div>
+                    <div className="review-section"><div className="review-label">👤 Solicitante</div><div className="review-value">{solicitanteId === 'outro' ? solicitante : (people.find(p => p.id === solicitanteId)?.name || '')}</div></div>
                   </div>
-                  <div style={{ marginTop: 'var(--space-4)', display: 'flex', gap: 'var(--space-2)' }}>
-                    {needsSound && <span className="badge badge-info">🔊 Som</span>}
-                    {needsDeaconry && <span className="badge badge-info">👔 Diaconato</span>}
+                  <div style={{ marginTop: 'var(--space-4)', display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                    {selectedNeeds.map(needId => {
+                      const need = needTypes.find(n => n.id === needId);
+                      return need ? <span key={need.id} className="badge badge-info">{need.icon} {need.name}</span> : null;
+                    })}
                   </div>
                 </div>
               </div>

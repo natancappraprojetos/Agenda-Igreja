@@ -46,7 +46,7 @@ export default function LoginPage() {
       <div className="login-card">
         <div className="login-header">
           <div className="login-logo">⛪</div>
-          <h1 className="login-title">Agenda Igreja</h1>
+          <h1 className="login-title">Igreja Central de Santo Afonso</h1>
           <p className="login-subtitle">
             Faça login para acessar o sistema
           </p>
