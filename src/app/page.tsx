@@ -1,11 +1,11 @@
-import { createClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { format, isToday, isTomorrow, isThisWeek, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { Event } from '@/lib/types';
 
 export default async function PublicAgendaPage() {
-  const supabase = createClient();
+  const supabase = createServerSupabaseClient();
 
   // Fetch upcoming events from today onwards
   const today = new Date().toISOString().split('T')[0];
