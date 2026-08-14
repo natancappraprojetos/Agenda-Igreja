@@ -166,7 +166,17 @@ export default function AgendaPage() {
                 setView('day');
               }}
             >
-              <div className="calendar-day-number">{day.getDate()}</div>
+              <div className="calendar-day-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: '4px' }}>
+                <span className="calendar-day-number">{day.getDate()}</span>
+                <Link
+                  href={`/agendar?date=${toDateString(day)}`}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ color: 'var(--primary)', textDecoration: 'none', fontSize: '1.2rem', lineHeight: 1, fontWeight: 'bold' }}
+                  title="Agendar Evento"
+                >
+                  +
+                </Link>
+              </div>
               <div className="calendar-day-events">
                 {dayEvents.slice(0, 3).map(ev => (
                   <div

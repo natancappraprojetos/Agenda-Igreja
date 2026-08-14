@@ -59,6 +59,14 @@ export default function PublicAgendarWizard() {
 
   useEffect(() => { fetchReferenceData(); }, [fetchReferenceData]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const dateParam = searchParams.get('date');
+      if (dateParam) setDate(dateParam);
+    }
+  }, []);
+
   // Auto-set title based on event type
   useEffect(() => {
     if (eventTypeId && !title) {
