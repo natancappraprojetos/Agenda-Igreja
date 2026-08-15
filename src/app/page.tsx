@@ -188,7 +188,7 @@ export default function AgendaPage() {
                     }}
                     title={`${formatTime(ev.start_time)} ${ev.title}`}
                   >
-                    {formatTime(ev.start_time)} {ev.title}
+                    <span className="hide-on-mobile">{formatTime(ev.start_time)} </span>{ev.title}
                   </div>
                 ))}
                 {dayEvents.length > 3 && (
@@ -270,9 +270,9 @@ export default function AgendaPage() {
     <>
       {/* Header Público */}
       <header style={{ 
-        backgroundColor: 'var(--bg-primary)', 
-        padding: 'var(--space-4) var(--space-4)',
-        borderBottom: '1px solid var(--border-color)',
+        backgroundColor: 'var(--surface)', 
+        padding: 'var(--space-2) var(--space-4)',
+        borderBottom: '1px solid var(--border)',
         position: 'sticky',
         top: 0,
         zIndex: 10,
@@ -284,7 +284,7 @@ export default function AgendaPage() {
           <div className="login-logo" style={{ overflow: 'hidden', width: 40, height: 40, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--primary)' }}>
             <img src="/icon" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+          <h1 className="hide-on-mobile" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
             Central Santo Afonso
           </h1>
         </div>

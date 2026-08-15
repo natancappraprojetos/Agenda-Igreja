@@ -2166,4 +2166,12 @@ h4 { font-size: var(--font-size-lg); }
   .wizard {
     padding-bottom: 80px; /* Space for the floating button */
   }
+
+  .hide-on-mobile {
+    display: none !important;
+  }
+
+  .app-content {
+    padding: var(--space-2) !important;
+  }
 }
