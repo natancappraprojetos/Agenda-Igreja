@@ -67,8 +67,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       />
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <div className="sidebar-logo" style={{ overflow: 'hidden', padding: 0, backgroundColor: 'var(--primary)', borderRadius: '16px' }}>
-            <img src="/icon.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div className="sidebar-logo" style={{ overflow: 'hidden', padding: 0, backgroundColor: 'transparent', borderRadius: '50%', width: '40px', height: '40px' }}>
+            <img src="/icon.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: 'var(--primary)' }} />
           </div>
           <div>
             <div className="sidebar-brand">Igreja Santo Afonso</div>
