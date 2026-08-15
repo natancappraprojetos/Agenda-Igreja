@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/lib/hooks/useToast';
 import Header from '@/components/layout/Header';
 import Modal from '@/components/ui/Modal';
+import { useRouter } from 'next/navigation';
 import type { Ministry } from '@/lib/types';
 
 export default function MinisteriosPage() {
@@ -13,6 +14,7 @@ export default function MinisteriosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<Ministry | null>(null);
   const [saving, setSaving] = useState(false);
+  const router = useRouter();
   const supabase = createClient();
   const { addToast } = useToast();
 
@@ -72,7 +74,7 @@ export default function MinisteriosPage() {
         ) : (
           <div className="grid grid-3">
             {items.map(item => (
-              <div key={item.id} className="card card-hover" onClick={() => openEdit(item)} style={{ cursor: 'pointer', borderLeft: `4px solid ${item.color}` }}>
+              <div key={item.id} className="card card-hover" onClick={() => router.push(`/ministerios/${item.id}`)} style={{ cursor: 'pointer', borderLeft: `4px solid ${item.color}` }}>
                 <div className="card-header">
                   <h3 className="card-title">{item.name}</h3>
                   {!item.is_active && <span className="badge badge-neutral">Inativo</span>}
