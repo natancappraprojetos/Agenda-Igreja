@@ -62,9 +62,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       />
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <div className="sidebar-logo">⛪</div>
+          <div className="sidebar-logo" style={{ overflow: 'hidden', padding: 0, backgroundColor: 'var(--primary)' }}>
+            <img src="/icon.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
           <div>
-            <div className="sidebar-brand">Agenda Igreja</div>
+            <div className="sidebar-brand">Igreja Santo Afonso</div>
             <div className="sidebar-brand-sub">Gerenciamento</div>
           </div>
         </div>
