@@ -166,7 +166,7 @@ export default function AgendaPage() {
                 setView('day');
               }}
             >
-              <div className="calendar-day-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingRight: '4px' }}>
+              <div className="calendar-day-header" style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '4px', width: '100%' }}>
                 <span className="calendar-day-number">{day.getDate()}</span>
                 <Link
                   href={`/agendar?date=${toDateString(day)}`}
@@ -299,8 +299,8 @@ export default function AgendaPage() {
         )}
       </header>
       <div className="app-content">
-        <div className="calendar-header">
-          <div className="calendar-nav">
+        <div className="calendar-header" style={{ gap: 'var(--space-2)' }}>
+          <div className="calendar-nav" style={{ flexWrap: 'wrap' }}>
             <button className="calendar-nav-btn" onClick={() => navigate(-1)} aria-label="Anterior">
               ◀
             </button>
