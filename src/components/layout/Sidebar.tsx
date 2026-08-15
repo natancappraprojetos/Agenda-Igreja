@@ -3,6 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { 
+  CalendarDays, LayoutDashboard, PlusCircle, AlertTriangle, 
+  Users, Landmark, MapPin, Bell, Tags, ClipboardList, 
+  ScrollText, UserCog, Wrench, BookOpen, History, LogOut
+} from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -10,27 +15,27 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { href: '/', icon: '📅', label: 'Agenda Geral' },
-  { href: '/minha-agenda', icon: '👤', label: 'Minha Agenda' },
-  { href: '/eventos/novo', icon: '➕', label: 'Novo Evento' },
-  { href: '/pendencias', icon: '⚠️', label: 'Pendências' },
+  { href: '/', icon: <CalendarDays size={20} />, label: 'Agenda Geral' },
+  { href: '/minha-agenda', icon: <LayoutDashboard size={20} />, label: 'Visão Geral' },
+  { href: '/eventos/novo', icon: <PlusCircle size={20} />, label: 'Novo Evento' },
+  { href: '/pendencias', icon: <AlertTriangle size={20} />, label: 'Pendências' },
 ];
 
 const cadastrosItems = [
-  { href: '/pessoas', icon: '👥', label: 'Pessoas' },
-  { href: '/ministerios', icon: '🏛️', label: 'Ministérios' },
-  { href: '/locais', icon: '📍', label: 'Locais' },
-  { href: '/musicas', icon: '🎵', label: 'Músicas' },
-  { href: '/escalas', icon: '📋', label: 'Escalas' },
+  { href: '/pessoas', icon: <Users size={20} />, label: 'Pessoas' },
+  { href: '/ministerios', icon: <Landmark size={20} />, label: 'Ministérios' },
+  { href: '/locais', icon: <MapPin size={20} />, label: 'Locais' },
+  // { href: '/musicas', icon: <Music size={20} />, label: 'Músicas' },
+  // { href: '/escalas', icon: <Clipboard size={20} />, label: 'Escalas' },
 ];
 
 const adminItems = [
-  { href: '/admin/funcoes', icon: '🔧', label: 'Funções' },
-  { href: '/admin/tipos-evento', icon: '📂', label: 'Tipos de Evento' },
-  { href: '/admin/liturgia-modelos', icon: '📜', label: 'Modelos de Liturgia' },
-  { href: '/admin/liturgia-item-tipos', icon: '⏱️', label: 'Itens de Liturgia' },
-  { href: '/admin/usuarios', icon: '🔐', label: 'Usuários' },
-  { href: '/admin/historico', icon: '📝', label: 'Histórico' },
+  { href: '/admin/funcoes', icon: <Wrench size={20} />, label: 'Funções' },
+  { href: '/admin/tipos-evento', icon: <Tags size={20} />, label: 'Tipos de Evento' },
+  { href: '/admin/liturgia-modelos', icon: <BookOpen size={20} />, label: 'Modelos de Liturgia' },
+  { href: '/admin/liturgia-item-tipos', icon: <ScrollText size={20} />, label: 'Itens de Liturgia' },
+  { href: '/admin/usuarios', icon: <UserCog size={20} />, label: 'Usuários (via Supabase)' },
+  { href: '/admin/historico', icon: <History size={20} />, label: 'Histórico' },
 ];
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
@@ -105,7 +110,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             className={`sidebar-link ${isActive('/notificacoes') ? 'active' : ''}`}
             onClick={onClose}
           >
-            <span className="sidebar-link-icon">🔔</span>
+            <span className="sidebar-link-icon"><Bell size={20} /></span>
             Notificações
           </Link>
 
@@ -113,21 +118,21 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <h3 className="sidebar-group-title">Configurações</h3>
             <nav className="sidebar-nav">
               <Link href="/admin/tipos-evento" className={`sidebar-link ${pathname === '/admin/tipos-evento' ? 'active' : ''}`} onClick={onClose}>
-                <span className="sidebar-icon">🏷️</span>
+                <span className="sidebar-link-icon"><Tags size={20} /></span>
                 Tipos de Evento
               </Link>
 
               <Link href="/admin/necessidades" className={`sidebar-link ${pathname === '/admin/necessidades' ? 'active' : ''}`} onClick={onClose}>
-                <span className="sidebar-icon">📋</span>
+                <span className="sidebar-link-icon"><ClipboardList size={20} /></span>
                 Necessidades
               </Link>
               <Link href="/admin/liturgia-item-tipos" className={`sidebar-link ${pathname === '/admin/liturgia-item-tipos' ? 'active' : ''}`} onClick={onClose}>
-                <span className="sidebar-icon">📜</span>
+                <span className="sidebar-link-icon"><ScrollText size={20} /></span>
                 Tipos de Liturgia
               </Link>
               <Link href="/admin/usuarios" className={`sidebar-link ${pathname === '/admin/usuarios' ? 'active' : ''}`} onClick={onClose}>
-                <span className="sidebar-icon">👥</span>
-                Usuários
+                <span className="sidebar-link-icon"><UserCog size={20} /></span>
+                Usuários (Supabase)
               </Link>
             </nav>
           </div>
@@ -166,9 +171,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           <button
             className="btn btn-ghost btn-sm btn-block mt-2"
             onClick={signOut}
-            style={{ justifyContent: 'flex-start', paddingLeft: 'var(--space-3)' }}
+            style={{ justifyContent: 'flex-start', paddingLeft: 'var(--space-3)', color: 'var(--text-secondary)' }}
           >
-            <span>🚪</span> Sair
+            <LogOut size={18} style={{ marginRight: '8px' }} /> Sair
           </button>
         </div>
       </aside>

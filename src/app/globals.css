@@ -308,7 +308,7 @@ h4 { font-size: var(--font-size-lg); }
 }
 
 .sidebar-link.active {
-  background-color: var(--primary-bg);
+  background-color: transparent;
   color: var(--primary);
   font-weight: 600;
 }
