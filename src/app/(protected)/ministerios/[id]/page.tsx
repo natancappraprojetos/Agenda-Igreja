@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/lib/hooks/useToast';
 import Header from '@/components/layout/Header';
 import Modal from '@/components/ui/Modal';
@@ -10,7 +10,8 @@ import PersonSelect from '@/components/ui/PersonSelect';
 import { Landmark, Trash2, Crown } from 'lucide-react';
 import type { Ministry, Person } from '@/lib/types';
 
-export default function MinisterioDetalhesPage({ params }: { params: { id: string } }) {
+export default function MinisterioDetalhesPage() {
+  const params = useParams();
   const router = useRouter();
   const supabase = createClient();
   const { addToast } = useToast();
@@ -32,7 +33,7 @@ export default function MinisterioDetalhesPage({ params }: { params: { id: strin
     const { data: minData, error: minError } = await supabase
       .from('ministries')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', params.id as string)
       .single();
 
     if (minError || !minData) {
@@ -46,7 +47,7 @@ export default function MinisterioDetalhesPage({ params }: { params: { id: strin
     const { data: membersData } = await supabase
       .from('person_ministries')
       .select('*, person:people(*)')
-      .eq('ministry_id', params.id)
+      .eq('ministry_id', params.id as string)
       .order('is_leader', { ascending: false });
 
     setMembers(membersData || []);
@@ -67,7 +68,7 @@ export default function MinisterioDetalhesPage({ params }: { params: { id: strin
     try {
       const { error } = await supabase.from('person_ministries').insert({
         person_id: newPersonId,
-        ministry_id: params.id,
+        ministry_id: params.id as string,
         is_leader: isLeader
       });
       if (error) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/lib/hooks/useToast';
 import Header from '@/components/layout/Header';
 import Modal from '@/components/ui/Modal';
@@ -29,7 +29,8 @@ interface ItemType {
   default_duration_minutes: number;
 }
 
-export default function LiturgiaBuilderPage({ params }: { params: { id: string } }) {
+export default function LiturgiaBuilderPage() {
+  const params = useParams();
   const router = useRouter();
   const supabase = createClient();
   const { addToast } = useToast();
@@ -56,7 +57,7 @@ export default function LiturgiaBuilderPage({ params }: { params: { id: string }
     const { data: tplData, error: tplError } = await supabase
       .from('liturgy_templates')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', params.id as string)
       .single();
 
     if (tplError || !tplData) {
@@ -70,7 +71,7 @@ export default function LiturgiaBuilderPage({ params }: { params: { id: string }
     const { data: itemsData } = await supabase
       .from('liturgy_template_items')
       .select('*, type:liturgy_item_types(name, icon)')
-      .eq('template_id', params.id)
+      .eq('template_id', params.id as string)
       .order('order_index');
     setItems(itemsData || []);
 
@@ -92,7 +93,7 @@ export default function LiturgiaBuilderPage({ params }: { params: { id: string }
     const newOrder = items.length > 0 ? Math.max(...items.map(i => i.order_index)) + 1 : 1;
     
     const { error } = await supabase.from('liturgy_template_items').insert({
-      template_id: params.id,
+      template_id: params.id as string,
       item_type_id: type.id,
       title: type.name, // By default the title is the type name
       order_index: newOrder,

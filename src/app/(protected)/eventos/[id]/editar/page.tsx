@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/lib/hooks/useToast';
 import Header from '@/components/layout/Header';
 
-export default function EditarEventoPage({ params }: { params: { id: string } }) {
+export default function EditarEventoPage() {
+  const params = useParams();
   const router = useRouter();
   const supabase = createClient();
   const { addToast } = useToast();
@@ -32,7 +33,7 @@ export default function EditarEventoPage({ params }: { params: { id: string } })
     const { data: event, error } = await supabase
       .from('events')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', params.id as string)
       .single();
 
     if (error || !event) {
@@ -71,7 +72,7 @@ export default function EditarEventoPage({ params }: { params: { id: string } })
         end_time: endTime || null,
         location_id: locationId || null
       })
-      .eq('id', params.id);
+      .eq('id', params.id as string);
 
     if (error) {
       addToast({ type: 'error', title: 'Erro ao salvar evento', message: error.message });

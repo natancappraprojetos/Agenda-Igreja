@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/lib/hooks/useToast';
 import { useAuth } from '@/lib/hooks/useAuth';
 import Header from '@/components/layout/Header';
 import PersonSelect from '@/components/ui/PersonSelect';
 import LiturgyEditor from './LiturgyEditor';
 
-export default function EventoDetalhesPage({ params }: { params: { id: string } }) {
+export default function EventoDetalhesPage() {
+  const params = useParams();
   const router = useRouter();
   const supabase = createClient();
   const { addToast } = useToast();
@@ -62,7 +63,7 @@ export default function EventoDetalhesPage({ params }: { params: { id: string } 
         ministry:ministries(name),
         responsible:people!events_responsible_person_id_fkey(name)
       `)
-      .eq('id', params.id)
+      .eq('id', params.id as string)
       .single();
 
     if (error || !eventData) {
@@ -106,7 +107,7 @@ export default function EventoDetalhesPage({ params }: { params: { id: string } 
     }
     try {
       const { error } = await supabase.from('event_participants').insert({
-        event_id: params.id,
+        event_id: params.id as string,
         role_id: newParticipantRoleId,
         person_id: newParticipantPersonId
       });
@@ -130,7 +131,7 @@ export default function EventoDetalhesPage({ params }: { params: { id: string } 
     if (!confirm('TEM CERTEZA que deseja excluir este evento? Esta ação não pode ser desfeita e removerá todas as escalas e liturgias associadas.')) return;
     try {
       setLoading(true);
-      const { error } = await supabase.from('events').delete().eq('id', params.id);
+      const { error } = await supabase.from('events').delete().eq('id', params.id as string);
       if (error) throw error;
       addToast({ type: 'success', title: 'Evento excluído com sucesso!' });
       router.push('/admin'); // Ou para a página inicial
@@ -177,7 +178,7 @@ export default function EventoDetalhesPage({ params }: { params: { id: string } 
           Voltar
         </button>
         {(isAdmin || isLeadership) && (
-          <button className="btn btn-secondary btn-sm" onClick={() => router.push(`/eventos/${params.id}/editar`)} style={{ marginRight: '8px' }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => router.push(`/eventos/${params.id as string}/editar`)} style={{ marginRight: '8px' }}>
             Editar
           </button>
         )}
