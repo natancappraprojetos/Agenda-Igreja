@@ -176,6 +176,11 @@ export default function EventoDetalhesPage({ params }: { params: { id: string } 
         <button className="btn btn-secondary btn-sm" onClick={() => router.push('/agenda')} style={{ marginRight: '8px' }}>
           Voltar
         </button>
+        {(isAdmin || isLeadership) && (
+          <button className="btn btn-secondary btn-sm" onClick={() => router.push(`/eventos/${params.id}/editar`)} style={{ marginRight: '8px' }}>
+            Editar
+          </button>
+        )}
         <button className="btn btn-primary btn-sm" onClick={shareToWhatsApp}>
           Compartilhar no WhatsApp 💬
         </button>

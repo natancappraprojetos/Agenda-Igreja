@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Header from '@/components/layout/Header';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 interface HistoryLog {
   id: string;
@@ -22,6 +23,7 @@ export default function HistoricoPage() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const supabase = createClient();
+  const { person } = useAuth();
 
   useEffect(() => {
     fetchLogs();
@@ -120,12 +122,18 @@ export default function HistoricoPage() {
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {new Date(log.created_at).toLocaleString('pt-BR')}
                     </td>
-                    <td style={{ fontWeight: 600 }}>
-                      {log.profiles?.name || 'Sistema'}
+                    <td>
+                      {log.user_id === person?.id ? (
+                        <strong>Você</strong>
+                      ) : (
+                        log.profiles?.name || 'Desconhecido'
+                      )}
                     </td>
                     <td>{getActionLabel(log.action)}</td>
                     <td>
-                      {getEntityLabel(log.entity_type, log.details)}
+                      <div style={{ fontWeight: 500 }}>
+                        {getEntityLabel(log.entity_type, log.details)}
+                      </div>
                     </td>
                   </tr>
                 ))}

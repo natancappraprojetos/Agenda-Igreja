@@ -34,7 +34,6 @@ const adminItems = [
   { href: '/admin/tipos-evento', icon: <Tags size={20} />, label: 'Tipos de Evento' },
   { href: '/admin/liturgia-modelos', icon: <BookOpen size={20} />, label: 'Modelos de Liturgia' },
   { href: '/admin/liturgia-item-tipos', icon: <ScrollText size={20} />, label: 'Itens de Liturgia' },
-  { href: '/admin/usuarios', icon: <UserCog size={20} />, label: 'Usuários (via Supabase)' },
   { href: '/admin/historico', icon: <History size={20} />, label: 'Histórico' },
 ];
 
@@ -129,10 +128,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <Link href="/admin/liturgia-item-tipos" className={`sidebar-link ${pathname === '/admin/liturgia-item-tipos' ? 'active' : ''}`} onClick={onClose}>
                 <span className="sidebar-link-icon"><ScrollText size={20} /></span>
                 Tipos de Liturgia
-              </Link>
-              <Link href="/admin/usuarios" className={`sidebar-link ${pathname === '/admin/usuarios' ? 'active' : ''}`} onClick={onClose}>
-                <span className="sidebar-link-icon"><UserCog size={20} /></span>
-                Usuários (Supabase)
               </Link>
             </nav>
           </div>
