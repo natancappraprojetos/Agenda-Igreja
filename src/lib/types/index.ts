@@ -324,6 +324,18 @@ export interface AuditLog {
   user?: User;
 }
 
+// ---- Bot Foundation ----
+
+export interface MonthlyLeader {
+  id: string;
+  month_year: string;
+  role_category: string;
+  person_id: string;
+  created_at: string;
+  updated_at: string;
+  person?: Person;
+}
+
 // ---- Conflict Checking ----
 
 export interface LocationConflict {
