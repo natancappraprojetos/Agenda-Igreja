@@ -258,7 +258,14 @@ export default function AgendaPage() {
                 </div>
               </div>
             ) : (
-              dayEvents.map(renderEventCard)
+              <>
+                {dayEvents.map(renderEventCard)}
+                <div style={{ marginTop: 'var(--space-4)', display: 'flex', justifyContent: 'center' }}>
+                  <Link href={`/agendar?date=${toDateString(currentDate)}`} className="btn btn-outline" style={{ width: '100%' }}>
+                    ➕ Adicionar evento neste dia
+                  </Link>
+                </div>
+              </>
             )}
           </div>
         </div>

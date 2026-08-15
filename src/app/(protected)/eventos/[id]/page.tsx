@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/lib/hooks/useToast';
+import { useAuth } from '@/lib/hooks/useAuth';
 import Header from '@/components/layout/Header';
 import PersonSelect from '@/components/ui/PersonSelect';
 import LiturgyEditor from './LiturgyEditor';
@@ -12,6 +13,7 @@ export default function EventoDetalhesPage({ params }: { params: { id: string } 
   const router = useRouter();
   const supabase = createClient();
   const { addToast } = useToast();
+  const { isAdmin, isLeadership } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [event, setEvent] = useState<any>(null);
@@ -124,6 +126,21 @@ export default function EventoDetalhesPage({ params }: { params: { id: string } 
     fetchEventData();
   };
 
+  const handleDeleteEvent = async () => {
+    if (!confirm('TEM CERTEZA que deseja excluir este evento? Esta ação não pode ser desfeita e removerá todas as escalas e liturgias associadas.')) return;
+    try {
+      setLoading(true);
+      const { error } = await supabase.from('events').delete().eq('id', params.id);
+      if (error) throw error;
+      addToast({ type: 'success', title: 'Evento excluído com sucesso!' });
+      router.push('/admin'); // Ou para a página inicial
+    } catch (error) {
+      console.error(error);
+      addToast({ type: 'error', title: 'Erro ao excluir o evento.' });
+      setLoading(false);
+    }
+  };
+
   const shareToWhatsApp = () => {
     if (!event) return;
     
@@ -209,6 +226,14 @@ export default function EventoDetalhesPage({ params }: { params: { id: string } 
                   {event.needs_worship && <span className="badge badge-neutral">🎵 Louvor</span>}
                   {event.needs_deaconry && <span className="badge badge-neutral">🤝 Diaconato</span>}
                 </div>
+              </div>
+            )}
+
+            {(isAdmin || isLeadership) && (
+              <div style={{ marginTop: 'var(--space-8)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-danger)', textAlign: 'right' }}>
+                <button onClick={handleDeleteEvent} className="btn btn-danger">
+                  🗑️ Excluir Evento Permanentemente
+                </button>
               </div>
             )}
           </div>
