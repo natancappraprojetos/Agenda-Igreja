@@ -288,8 +288,8 @@ export default function AgendaPage() {
         alignItems: 'center'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <div className="login-logo" style={{ overflow: 'hidden', width: 40, height: 40, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--primary)' }}>
-            <img src="/icon" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div className="login-logo" style={{ overflow: 'hidden', width: 40, height: 40, borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--primary)' }}>
+            <img src="/icon.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <h1 className="hide-on-mobile" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
             Central Santo Afonso
