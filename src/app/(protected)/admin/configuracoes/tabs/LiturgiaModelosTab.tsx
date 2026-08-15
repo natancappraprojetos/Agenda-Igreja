@@ -13,7 +13,7 @@ interface LiturgyTemplate {
   created_at: string;
 }
 
-export default function LiturgyTemplatesPage() {
+export default function LiturgiaModelosTab() {
   const [templates, setTemplates] = useState<LiturgyTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
@@ -99,16 +99,15 @@ export default function LiturgyTemplatesPage() {
 
   return (
     <>
-      <Header title="Modelos de Liturgia" onMenuToggle={() => {}} />
-      <div className="app-content">
+      <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', padding: 'var(--space-4)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
-          <p style={{ color: 'var(--text-secondary)' }}>
-            Crie modelos padronizados de liturgia para reaproveitar ao criar eventos.
-          </p>
-          <button className="btn btn-primary" onClick={() => openModal()}>
-            Novo Modelo
-          </button>
-        </div>
+        <p style={{ color: 'var(--text-secondary)' }}>
+          Crie modelos padronizados de liturgia para reaproveitar ao criar eventos.
+        </p>
+        <button className="btn btn-primary" onClick={() => openModal()}>
+          Novo Modelo
+        </button>
+      </div>
 
         {loading ? (
           <div className="loading-page"><div className="spinner" /></div>

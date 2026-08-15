@@ -66,11 +66,6 @@ export default function AdminDashboardPage() {
                 <h3 style={{ margin: 0 }}>Histórico de Alterações</h3>
                 <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Registro de quem criou, editou ou apagou eventos.</p>
               </Link>
-              <Link href="/admin/usuarios" className="card" style={{ padding: 'var(--space-5)', textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', border: '1px solid var(--primary-light)' }}>
-                <div style={{ fontSize: '2rem' }}>🔐</div>
-                <h3 style={{ margin: 0 }}>Usuários (Config)</h3>
-                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Controle de acessos e permissões do sistema.</p>
-              </Link>
             </>
           )}
         </div>

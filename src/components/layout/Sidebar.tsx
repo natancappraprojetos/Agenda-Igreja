@@ -30,10 +30,7 @@ const cadastrosItems = [
 ];
 
 const adminItems = [
-  { href: '/admin/funcoes', icon: <Wrench size={20} />, label: 'Funções' },
-  { href: '/admin/tipos-evento', icon: <Tags size={20} />, label: 'Tipos de Evento' },
-  { href: '/admin/liturgia-modelos', icon: <BookOpen size={20} />, label: 'Modelos de Liturgia' },
-  { href: '/admin/liturgia-item-tipos', icon: <ScrollText size={20} />, label: 'Itens de Liturgia' },
+  { href: '/admin/configuracoes', icon: <Wrench size={20} />, label: 'Configurações' },
   { href: '/admin/historico', icon: <History size={20} />, label: 'Histórico' },
 ];
 
