@@ -29,20 +29,40 @@ export default function HistoricoPage() {
 
   async function fetchLogs() {
     setLoading(true);
+    // Remove the implicit join which fails without a direct FK
     const { data, error } = await supabase
       .from('history_logs')
-      .select(`
-        id, user_id, action, entity_type, entity_id, details, created_at,
-        profiles ( name )
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
 
     if (error) {
       console.error('Erro ao buscar logs:', error);
-    } else {
-      setLogs(data as any);
+      setLoading(false);
+      return;
     }
+
+    const logsData = data || [];
+    
+    // Fetch profiles manually
+    const userIds = [...new Set(logsData.map(l => l.user_id).filter(Boolean))];
+    if (userIds.length > 0) {
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .in('id', userIds);
+        
+      const profileMap = Object.fromEntries((profilesData || []).map(p => [p.id, p.name]));
+      
+      const enrichedLogs = logsData.map(log => ({
+        ...log,
+        profiles: { name: profileMap[log.user_id] || 'Desconhecido' }
+      }));
+      setLogs(enrichedLogs as any);
+    } else {
+      setLogs(logsData as any);
+    }
+    
     setLoading(false);
   }
 
