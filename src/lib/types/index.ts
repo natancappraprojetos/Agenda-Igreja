@@ -92,6 +92,7 @@ export interface Location {
 export interface EventType {
   id: string;
   name: string;
+  description?: string | null;
   icon: string;
   color: string;
   is_active: boolean;

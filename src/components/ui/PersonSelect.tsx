@@ -96,7 +96,7 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
   };
 
   return (
-    <div className="form-group" style={{ position: 'relative' }} ref={dropdownRef}>
+    <div className="form-group" style={{ position: 'relative', zIndex: 100 }} ref={dropdownRef}>
       {label && <label className="form-label">{label}</label>}
       
       <div 

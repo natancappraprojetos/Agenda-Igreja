@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import Header from '@/components/layout/Header';
+import EmojiPicker from '@/components/ui/EmojiPicker';
 import { useToast } from '@/lib/hooks/useToast';
 import type { EventNeedType } from '@/lib/types';
 
@@ -81,12 +81,9 @@ export default function AdminNecessidadesPage() {
   };
 
   return (
-    <>
-      <Header title="Configurações de Necessidades (Perguntas de Agendamento)" onMenuToggle={() => {}} />
-      <div className="app-content">
-        <div style={{ maxWidth: 800, margin: '0 auto' }}>
-          
-          <div className="card" style={{ marginBottom: 'var(--space-6)', padding: 'var(--space-4)' }}>
+    <div style={{ maxWidth: 800, margin: '0 auto' }}>
+      
+      <div className="card" style={{ marginBottom: 'var(--space-6)', padding: 'var(--space-4)' }}>
             <h3 style={{ marginBottom: 'var(--space-4)' }}>
               {editingId ? 'Editar Necessidade' : 'Nova Necessidade'}
             </h3>
@@ -97,7 +94,7 @@ export default function AdminNecessidadesPage() {
               <div style={{ display: 'flex', gap: 'var(--space-4)', alignItems: 'flex-start' }}>
                 <div className="form-group" style={{ width: '80px', marginBottom: 0 }}>
                   <label className="form-label">Ícone</label>
-                  <input type="text" className="form-input" value={icon} onChange={e => setIcon(e.target.value)} placeholder="🔊" maxLength={5} style={{ textAlign: 'center', fontSize: '1.5rem' }} />
+                  <EmojiPicker value={icon} onChange={setIcon} />
                 </div>
                 <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
                   <label className="form-label">Nome (ex: Sonoplastia / Mídia)</label>
@@ -165,8 +162,6 @@ export default function AdminNecessidadesPage() {
               </table>
             )}
           </div>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }

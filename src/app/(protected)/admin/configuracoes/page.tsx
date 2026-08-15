@@ -4,9 +4,13 @@ import { useState } from 'react';
 import Header from '@/components/layout/Header';
 import { Tags, Wrench, BookOpen } from 'lucide-react';
 import LiturgiaModelosTab from './tabs/LiturgiaModelosTab';
+import TiposEventoTab from './tabs/TiposEventoTab';
+import TiposLiturgiaTab from './tabs/TiposLiturgiaTab';
+import FuncoesTab from './tabs/FuncoesTab';
+import NecessidadesTab from './tabs/NecessidadesTab';
 
 export default function ConfiguracoesGeraisPage() {
-  const [activeTab, setActiveTab] = useState<'eventos' | 'funcoes' | 'liturgia'>('liturgia');
+  const [activeTab, setActiveTab] = useState<'eventos' | 'funcoes' | 'liturgia' | 'liturgia_tipos' | 'necessidades'>('liturgia');
 
   return (
     <>
@@ -21,6 +25,13 @@ export default function ConfiguracoesGeraisPage() {
             onClick={() => setActiveTab('liturgia')}
           >
             <BookOpen size={18} /> Modelos de Liturgia
+          </button>
+          <button 
+            className={`btn ${activeTab === 'liturgia_tipos' ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ borderRadius: 'var(--radius-md) var(--radius-md) 0 0', borderBottom: activeTab === 'liturgia_tipos' ? 'none' : '' }}
+            onClick={() => setActiveTab('liturgia_tipos')}
+          >
+            <BookOpen size={18} /> Tipos de Liturgia
           </button>
           
           <button 
@@ -38,23 +49,25 @@ export default function ConfiguracoesGeraisPage() {
           >
             <Wrench size={18} /> Funções da Escala
           </button>
+
+          <button 
+            className={`btn ${activeTab === 'necessidades' ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ borderRadius: 'var(--radius-md) var(--radius-md) 0 0', borderBottom: activeTab === 'necessidades' ? 'none' : '' }}
+            onClick={() => setActiveTab('necessidades')}
+          >
+            <Wrench size={18} /> Necessidades
+          </button>
         </div>
 
         {/* Tab Content */}
         <div>
           {activeTab === 'liturgia' && <LiturgiaModelosTab />}
-          
-          {activeTab === 'eventos' && (
-            <div style={{ padding: 'var(--space-8)', textAlign: 'center', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <h2 style={{ marginBottom: 'var(--space-2)' }}>Tipos de Eventos</h2>
-              <p style={{ color: 'var(--text-secondary)' }}>Aqui você poderá gerenciar Cultos, Reuniões, Treinamentos, etc.<br/>(Em breve)</p>
-            </div>
-          )}
-
-          {activeTab === 'funcoes' && (
-            <div style={{ padding: 'var(--space-8)', textAlign: 'center', backgroundColor: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <h2 style={{ marginBottom: 'var(--space-2)' }}>Funções da Escala</h2>
-              <p style={{ color: 'var(--text-secondary)' }}>Aqui você poderá cadastrar os cargos como Ancião, Diácono, Sonoplasta.<br/>(Em breve)</p>
+          {activeTab === 'liturgia_tipos' && <TiposLiturgiaTab />}
+          {activeTab === 'eventos' && <TiposEventoTab />}
+          {activeTab === 'funcoes' && <FuncoesTab />}
+          {activeTab === 'necessidades' && (
+            <div style={{ marginTop: '-var(--space-6)' }}>
+              <NecessidadesTab />
             </div>
           )}
         </div>

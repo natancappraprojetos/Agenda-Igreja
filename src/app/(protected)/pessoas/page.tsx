@@ -12,6 +12,10 @@ export default function PessoasPage() {
   const [items, setItems] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importing, setImporting] = useState(false);
+  
   const [editItem, setEditItem] = useState<Person | null>(null);
   const [saving, setSaving] = useState(false);
   const supabase = createClient();
@@ -88,12 +92,49 @@ export default function PessoasPage() {
     }
   };
 
+  const handleImport = async () => {
+    if (!importText.trim()) return;
+    
+    const lines = importText.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+      
+    if (lines.length === 0) return;
+    
+    setImporting(true);
+    try {
+      const payload = lines.map(name => ({
+        name,
+        is_active: true
+      }));
+      
+      const { error } = await supabase.from('people').insert(payload);
+      
+      if (error) throw error;
+      
+      addToast({ type: 'success', title: `${lines.length} pessoas importadas com sucesso!` });
+      setImportModalOpen(false);
+      setImportText('');
+      fetchData();
+    } catch (e) {
+      console.error(e);
+      addToast({ type: 'error', title: 'Erro ao importar pessoas' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <>
       <Header title="Cadastro de Pessoas" onMenuToggle={() => {}}>
-        <button className="btn btn-primary btn-sm" onClick={() => { resetForm(); setModalOpen(true); }}>
-          ➕ Nova Pessoa
-        </button>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => setImportModalOpen(true)}>
+            📥 Importar Lista
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={() => { resetForm(); setModalOpen(true); }}>
+            ➕ Nova Pessoa
+          </button>
+        </div>
       </Header>
       
       <div className="app-content">
@@ -183,6 +224,36 @@ export default function PessoasPage() {
               <label htmlFor="person_active" className="form-checkbox-label">Cadastro Ativo</label>
             </div>
           </form>
+        </Modal>
+
+        {/* Import Modal */}
+        <Modal 
+          isOpen={importModalOpen} 
+          onClose={() => setImportModalOpen(false)}
+          title="Importar Membros"
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={() => setImportModalOpen(false)} disabled={importing}>Cancelar</button>
+              <button className="btn btn-primary" onClick={handleImport} disabled={importing || !importText.trim()}>
+                {importing ? 'Importando...' : 'Importar Lista'}
+              </button>
+            </>
+          }
+        >
+          <div className="form-group">
+            <label className="form-label">Cole os nomes (um por linha)</label>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 'var(--space-2)' }}>
+              Copie do Excel ou Bloco de Notas e cole aqui. O sistema criará um cadastro para cada nome.
+            </p>
+            <textarea 
+              className="form-input" 
+              style={{ minHeight: '200px', resize: 'vertical' }}
+              value={importText}
+              onChange={e => setImportText(e.target.value)}
+              placeholder="João da Silva&#10;Maria Souza&#10;Pedro Santos"
+              autoFocus
+            />
+          </div>
         </Modal>
       </div>
     </>

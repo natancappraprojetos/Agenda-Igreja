@@ -110,24 +110,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             Notificações
           </Link>
 
-          <div className="sidebar-group">
-            <h3 className="sidebar-group-title">Configurações</h3>
-            <nav className="sidebar-nav">
-              <Link href="/admin/tipos-evento" className={`sidebar-link ${pathname === '/admin/tipos-evento' ? 'active' : ''}`} onClick={onClose}>
-                <span className="sidebar-link-icon"><Tags size={20} /></span>
-                Tipos de Evento
-              </Link>
 
-              <Link href="/admin/necessidades" className={`sidebar-link ${pathname === '/admin/necessidades' ? 'active' : ''}`} onClick={onClose}>
-                <span className="sidebar-link-icon"><ClipboardList size={20} /></span>
-                Necessidades
-              </Link>
-              <Link href="/admin/liturgia-item-tipos" className={`sidebar-link ${pathname === '/admin/liturgia-item-tipos' ? 'active' : ''}`} onClick={onClose}>
-                <span className="sidebar-link-icon"><ScrollText size={20} /></span>
-                Tipos de Liturgia
-              </Link>
-            </nav>
-          </div>
 
           {(isAdmin || isLeadership) && (
             <>

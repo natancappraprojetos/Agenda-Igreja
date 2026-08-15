@@ -23,6 +23,7 @@ export default function EventoDetalhesPage() {
   // Liturgy & Team data
   const [participants, setParticipants] = useState<any[]>([]);
   const [liturgyItems, setLiturgyItems] = useState<any[]>([]);
+  const [pendency, setPendency] = useState<any>(null);
   
   // Auxiliary Lookups
   const [roles, setRoles] = useState<any[]>([]);
@@ -80,6 +81,14 @@ export default function EventoDetalhesPage() {
       .select('*, role:roles(name), person:people(name, whatsapp)')
       .eq('event_id', params.id);
     if (parts) setParticipants(parts);
+
+    // Fetch Pendencies
+    const { data: pendencyData } = await supabase
+      .from('event_pendencies')
+      .select('*')
+      .eq('event_id', params.id)
+      .single();
+    if (pendencyData) setPendency(pendencyData);
 
     // Fetch Liturgy (if exists)
     const { data: lit } = await supabase
@@ -205,6 +214,35 @@ export default function EventoDetalhesPage() {
         {activeTab === 'resumo' && (
           <div className="card" style={{ padding: 'var(--space-6)', maxWidth: 800 }}>
             <h2 style={{ fontSize: '1.25rem', marginBottom: 'var(--space-4)' }}>{event.event_type?.icon} {event.event_type?.name}</h2>
+            
+            {/* Status Banner */}
+            {pendency && pendency.pendency_status === 'pending' && (
+              <div style={{ backgroundColor: 'var(--warning-light)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', border: '1px solid var(--warning)', marginBottom: 'var(--space-6)' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+                  <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                  <h3 style={{ margin: 0, color: 'var(--warning)', fontSize: '1rem' }}>Evento Pendente (Aguardando Escalas)</h3>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text)', marginBottom: 'var(--space-3)' }}>
+                  A data está reservada, mas faltam líderes preencherem suas respectivas escalas para considerarmos o evento concluído:
+                </p>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                  {event.event_type?.name.toLowerCase().includes('culto') && !pendency.has_preacher && <span className="badge badge-danger">Falta Pregador</span>}
+                  {event.event_type?.name.toLowerCase().includes('culto') && !pendency.has_worship_leader && <span className="badge badge-danger">Falta Louvor</span>}
+                  {event.needs_sound && !pendency.has_sound && <span className="badge badge-danger">Falta Sonoplastia</span>}
+                  {event.needs_deaconry && !pendency.has_deaconry && <span className="badge badge-danger">Falta Diaconato</span>}
+                  {!pendency.has_responsible && <span className="badge badge-danger">Falta Responsável</span>}
+                  {!pendency.has_location && <span className="badge badge-danger">Falta Local Definido</span>}
+                </div>
+              </div>
+            )}
+            
+            {pendency && pendency.pendency_status === 'complete' && (
+              <div style={{ backgroundColor: 'var(--success-light)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--success)', marginBottom: 'var(--space-6)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span style={{ fontSize: '1.2rem' }}>✅</span>
+                <span style={{ color: 'var(--success)', fontWeight: 600 }}>Evento Completamente Escalonado</span>
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
               <div>
                 <p className="form-label">Data e Hora</p>
