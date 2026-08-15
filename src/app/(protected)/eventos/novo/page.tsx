@@ -158,7 +158,7 @@ function NovoEventoWizard() {
       }
 
       addToast({ type: 'success', title: 'Evento criado!', message: `${title} foi adicionado à agenda.` });
-      router.push('/agenda');
+      router.push(`/eventos/${insertedEvent.id}`);
     } catch (error) {
       console.error('Error saving event:', error);
       addToast({ type: 'error', title: 'Erro ao salvar', message: 'Não foi possível criar o evento. Tente novamente.' });

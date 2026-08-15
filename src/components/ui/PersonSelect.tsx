@@ -89,6 +89,31 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
     }
   };
 
+  const handleFastCreate = async (name: string) => {
+    setSavingNew(true);
+    try {
+      const { data, error } = await supabase
+        .from('people')
+        .insert({ name: name.trim() })
+        .select()
+        .single();
+        
+      if (error) throw error;
+      
+      if (data) {
+        setPeople(prev => [...prev, data as Person].sort((a, b) => a.name.localeCompare(b.name)));
+        onChange(data.id);
+        setIsOpen(false);
+        setSearchTerm('');
+        addToast({ type: 'success', title: 'Pessoa adicionada com sucesso!' });
+      }
+    } catch (err) {
+      addToast({ type: 'error', title: 'Erro ao cadastrar pessoa' });
+    } finally {
+      setSavingNew(false);
+    }
+  };
+
   const openCreateModal = () => {
     setNewName(searchTerm);
     setIsOpen(false);
@@ -113,8 +138,8 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
       {isOpen && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, right: 0,
-          backgroundColor: 'var(--bg-primary)',
-          border: '1px solid var(--border-color)',
+          backgroundColor: 'var(--surface)',
+          border: '1px solid var(--border)',
           borderRadius: 'var(--radius-md)',
           marginTop: '4px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -144,8 +169,8 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
                     key={person.id}
                     style={{ 
                       padding: '10px 12px', cursor: 'pointer', 
-                      backgroundColor: value === person.id ? 'var(--bg-secondary)' : 'transparent',
-                      borderBottom: '1px solid var(--border-color)',
+                      backgroundColor: value === person.id ? 'var(--background-secondary)' : 'transparent',
+                      borderBottom: '1px solid var(--border)',
                       fontWeight: value === person.id ? 600 : 400
                     }}
                     onClick={() => { onChange(person.id); setIsOpen(false); setSearchTerm(''); }}
@@ -162,24 +187,23 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
                       color: 'var(--primary)', fontWeight: 600,
                       display: 'flex', alignItems: 'center', gap: '8px'
                     }}
-                    onClick={openCreateModal}
+                    onClick={() => handleFastCreate(searchTerm)}
                   >
-                    <span>+</span> Cadastrar novo: &quot;{searchTerm}&quot;
+                    <span>+</span> {savingNew ? 'Adicionando...' : `Adicionar "${searchTerm}" rápido`}
                   </div>
                 )}
                 
-                {!searchTerm && (
-                  <div 
-                    style={{ 
-                      padding: '10px 12px', cursor: 'pointer', 
-                      color: 'var(--primary)', fontWeight: 600,
-                      display: 'flex', alignItems: 'center', gap: '8px'
-                    }}
-                    onClick={openCreateModal}
-                  >
-                    <span>+</span> Cadastrar nova pessoa
-                  </div>
-                )}
+                <div 
+                  style={{ 
+                    padding: '10px 12px', cursor: 'pointer', 
+                    color: 'var(--text-secondary)', fontSize: '0.9rem',
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    borderTop: '1px solid var(--border)'
+                  }}
+                  onClick={openCreateModal}
+                >
+                  <span>📝</span> {searchTerm ? 'Cadastrar com WhatsApp/Email' : 'Cadastrar nova pessoa'}
+                </div>
               </>
             )}
           </div>
