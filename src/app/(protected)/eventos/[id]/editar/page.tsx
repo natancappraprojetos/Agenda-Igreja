@@ -74,7 +74,7 @@ export default function EditarEventoPage({ params }: { params: { id: string } })
       .eq('id', params.id);
 
     if (error) {
-      addToast({ type: 'error', title: 'Erro ao salvar evento', description: error.message });
+      addToast({ type: 'error', title: 'Erro ao salvar evento', message: error.message });
       setSaving(false);
     } else {
       addToast({ type: 'success', title: 'Evento atualizado com sucesso!' });
