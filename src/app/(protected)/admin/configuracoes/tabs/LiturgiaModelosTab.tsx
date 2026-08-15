@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Header from '@/components/layout/Header';
 import { useToast } from '@/lib/hooks/useToast';
@@ -14,6 +15,7 @@ interface LiturgyTemplate {
 }
 
 export default function LiturgiaModelosTab() {
+  const router = useRouter();
   const [templates, setTemplates] = useState<LiturgyTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
@@ -126,9 +128,10 @@ export default function LiturgiaModelosTab() {
                   <tr key={tpl.id}>
                     <td style={{ fontWeight: 600 }}>{tpl.name}</td>
                     <td style={{ color: 'var(--text-secondary)' }}>{tpl.description || '-'}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <button className="btn btn-ghost btn-sm" onClick={() => openModal(tpl)}>Editar</button>
-                      <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => deleteTemplate(tpl.id)}>Excluir</button>
+                    <td style={{ textAlign: 'center', display: 'flex', justifyContent: 'center', gap: '4px' }}>
+                      <button className="btn btn-primary btn-sm" onClick={() => router.push(`/admin/configuracoes/liturgia/${tpl.id}`)}>Montar Culto</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => openModal(tpl)}>📝</button>
+                      <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => deleteTemplate(tpl.id)}>❌</button>
                     </td>
                   </tr>
                 ))}
