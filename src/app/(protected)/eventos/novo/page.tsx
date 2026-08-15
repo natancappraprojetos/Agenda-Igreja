@@ -90,6 +90,8 @@ function NovoEventoWizard() {
 
   useEffect(() => { checkLocationConflict(); }, [checkLocationConflict]);
 
+  const isCulto = eventTypes.find(t => t.id === eventTypeId)?.name.toLowerCase().includes('culto') || false;
+
   const canProceed = () => {
     switch (step) {
       case 1: return !!eventTypeId;
@@ -102,6 +104,14 @@ function NovoEventoWizard() {
       case 8: return true; // review
       default: return false;
     }
+  };
+
+  const goToNextStep = () => {
+    setStep(s => s + 1);
+  };
+
+  const goToPrevStep = () => {
+    setStep(s => s - 1);
   };
 
   const handleSave = async () => {
@@ -338,23 +348,27 @@ function NovoEventoWizard() {
                 />
               </div>
 
-              <div className="form-group">
-                <label className="form-label">🎤 Pregador</label>
-                <PersonSelect
-                  value={preacherId}
-                  onChange={setPreacherId}
-                  placeholder="Buscar ou cadastrar..."
-                />
-              </div>
+              {isCulto && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">🎤 Pregador</label>
+                    <PersonSelect
+                      value={preacherId}
+                      onChange={setPreacherId}
+                      placeholder="Buscar ou cadastrar..."
+                    />
+                  </div>
 
-              <div className="form-group">
-                <label className="form-label">🎵 Responsável pelo Louvor</label>
-                <PersonSelect
-                  value={worshipLeaderId}
-                  onChange={setWorshipLeaderId}
-                  placeholder="Buscar ou cadastrar..."
-                />
-              </div>
+                  <div className="form-group">
+                    <label className="form-label">🎵 Responsável pelo Louvor</label>
+                    <PersonSelect
+                      value={worshipLeaderId}
+                      onChange={setWorshipLeaderId}
+                      placeholder="Buscar ou cadastrar..."
+                    />
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -512,7 +526,7 @@ function NovoEventoWizard() {
           {/* Navigation Buttons */}
           <div className="wizard-actions">
             {step > 1 ? (
-              <button className="btn btn-secondary" onClick={() => setStep(s => s - 1)}>
+              <button className="btn btn-secondary" onClick={goToPrevStep}>
                 ◀ Voltar
               </button>
             ) : (
@@ -524,7 +538,7 @@ function NovoEventoWizard() {
             {step < TOTAL_STEPS ? (
               <button
                 className="btn btn-primary"
-                onClick={() => setStep(s => s + 1)}
+                onClick={goToNextStep}
                 disabled={!canProceed()}
               >
                 Próximo ▶

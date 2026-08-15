@@ -116,10 +116,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <span className="sidebar-icon">🏷️</span>
                 Tipos de Evento
               </Link>
-              <Link href="/admin/ministerios" className={`sidebar-link ${pathname === '/admin/ministerios' ? 'active' : ''}`} onClick={onClose}>
-                <span className="sidebar-icon">🏛️</span>
-                Ministérios
-              </Link>
+
               <Link href="/admin/necessidades" className={`sidebar-link ${pathname === '/admin/necessidades' ? 'active' : ''}`} onClick={onClose}>
                 <span className="sidebar-icon">📋</span>
                 Necessidades

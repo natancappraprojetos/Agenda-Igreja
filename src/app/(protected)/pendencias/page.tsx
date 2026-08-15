@@ -87,12 +87,16 @@ export default function PendenciasPage() {
                   </div>
 
                   <div className="pendency-checklist">
-                    <div className={`pendency-item ${p.has_preacher ? 'done' : 'missing'}`}>
-                      {p.has_preacher ? '✅' : '❌'} Pregador
-                    </div>
-                    <div className={`pendency-item ${p.has_worship_leader ? 'done' : 'missing'}`}>
-                      {p.has_worship_leader ? '✅' : '❌'} Louvor
-                    </div>
+                    {p.event_type.toLowerCase().includes('culto') && (
+                      <>
+                        <div className={`pendency-item ${p.has_preacher ? 'done' : 'missing'}`}>
+                          {p.has_preacher ? '✅' : '❌'} Pregador
+                        </div>
+                        <div className={`pendency-item ${p.has_worship_leader ? 'done' : 'missing'}`}>
+                          {p.has_worship_leader ? '✅' : '❌'} Louvor
+                        </div>
+                      </>
+                    )}
                     <div className={`pendency-item ${p.has_sound ? 'done' : 'missing'}`}>
                       {p.has_sound ? '✅' : '❌'} Sonoplastia
                     </div>
@@ -106,6 +110,36 @@ export default function PendenciasPage() {
                       {p.has_location ? '✅' : '❌'} Local
                     </div>
                   </div>
+                  
+                  {p.event_status === 'scheduled' && (
+                    <div style={{ marginTop: 'var(--space-4)', display: 'flex', gap: 'var(--space-2)' }}>
+                      <button 
+                        className="btn btn-success" 
+                        style={{ flex: 1 }}
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          await supabase.from('events').update({ status: 'confirmed' }).eq('id', p.event_id);
+                          fetchData();
+                        }}
+                      >
+                        Aprovar Solicitação
+                      </button>
+                      <button 
+                        className="btn btn-danger" 
+                        style={{ flex: 1 }}
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if(!confirm('Deseja realmente recusar e excluir esta solicitação?')) return;
+                          await supabase.from('events').delete().eq('id', p.event_id);
+                          fetchData();
+                        }}
+                      >
+                        Recusar
+                      </button>
+                    </div>
+                  )}
                 </div>
               </Link>
             ))}

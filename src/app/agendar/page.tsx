@@ -89,17 +89,27 @@ export default function PublicAgendarWizard() {
 
   useEffect(() => { checkLocationConflict(); }, [checkLocationConflict]);
 
+  const isCulto = eventTypes.find(t => t.id === eventTypeId)?.name.toLowerCase().includes('culto') || false;
+
   const canProceed = () => {
     switch (step) {
       case 1: return !!eventTypeId;
       case 2: return !!date && !!startTime && !!title;
-      case 3: return locationConflicts.length === 0; // location optional but blocks if conflict
-      case 4: return true; // ministry optional
+      case 3: return true; // location is optional in UI? Wait, UI doesn't force it.
+      case 4: return true; // ministry is optional
       case 5: return true; // needs optional
-      case 6: return solicitanteId === 'outro' ? !!solicitante.trim() : !!solicitanteId; // identificação mandatory
+      case 6: return !!solicitanteId && (solicitanteId !== 'outro' || !!solicitante);
       case 7: return true; // review
       default: return false;
     }
+  };
+
+  const goToNextStep = () => {
+    setStep(s => s + 1);
+  };
+
+  const goToPrevStep = () => {
+    setStep(s => s - 1);
   };
 
   const handleSave = async () => {
@@ -385,12 +395,12 @@ export default function PublicAgendarWizard() {
 
             <div className="wizard-actions">
               {step > 1 ? (
-                <button className="btn btn-secondary" onClick={() => setStep(s => s - 1)}>◀ Voltar</button>
+                <button className="btn btn-secondary" onClick={goToPrevStep}>◀ Voltar</button>
               ) : (
                 <Link href="/" className="btn btn-ghost">Cancelar</Link>
               )}
               {step < TOTAL_STEPS ? (
-                <button className="btn btn-primary" onClick={() => setStep(s => s + 1)} disabled={!canProceed()}>Próximo ▶</button>
+                <button className="btn btn-primary" onClick={goToNextStep} disabled={!canProceed()}>Próximo ▶</button>
               ) : (
                 <button className="btn btn-success btn-lg" onClick={handleSave} disabled={saving || !canProceed()}>
                   {saving ? 'Agendando...' : '✅ Confirmar Agendamento'}

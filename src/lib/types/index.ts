@@ -355,6 +355,7 @@ export interface EventPendency {
   has_responsible: boolean;
   has_location: boolean;
   pendency_status: 'complete' | 'pending';
+  event_status: string;
 }
 
 // ---- Calendar ----
