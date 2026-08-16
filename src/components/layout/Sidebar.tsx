@@ -25,8 +25,7 @@ const cadastrosItems = [
   { href: '/pessoas', icon: <Users size={20} />, label: 'Pessoas' },
   { href: '/ministerios', icon: <Landmark size={20} />, label: 'Ministérios' },
   { href: '/locais', icon: <MapPin size={20} />, label: 'Locais' },
-  // { href: '/musicas', icon: <Music size={20} />, label: 'Músicas' },
-  // { href: '/escalas', icon: <Clipboard size={20} />, label: 'Escalas' },
+  { href: '/escalas', icon: <ClipboardList size={20} />, label: 'Escalas' },
 ];
 
 const adminItems = [
