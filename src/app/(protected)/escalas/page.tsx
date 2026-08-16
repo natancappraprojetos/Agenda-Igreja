@@ -1,12 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useAuth } from '@/lib/hooks/useAuth';
 import Header from '@/components/layout/Header';
 import EscalasGrid from '@/components/ui/EscalasGrid';
 import { BookOpen, Mic, Headset, Shield, CalendarIcon } from 'lucide-react';
 
 export default function EscalasPage() {
-  const [activeTab, setActiveTab] = useState<'pregadores' | 'musica' | 'sonoplastia' | 'diaconato'>('pregadores');
+  const { roles, isAdmin } = useAuth();
+  
+  // Set initial tab based on permissions
+  const [activeTab, setActiveTab] = useState<'pregadores' | 'musica' | 'sonoplastia' | 'diaconato'>(
+    isAdmin || roles.includes('anciao') ? 'pregadores' : 'musica'
+  );
 
   return (
     <>
@@ -17,12 +23,14 @@ export default function EscalasPage() {
           
           {/* Tabs for Departments */}
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-6)', borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--space-2)', overflowX: 'auto' }}>
-            <button 
-              className={`btn ${activeTab === 'pregadores' ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setActiveTab('pregadores')}
-            >
-              <BookOpen size={18} /> Púlpito (Anciãos)
-            </button>
+            {(isAdmin || roles.includes('anciao')) && (
+              <button 
+                className={`btn ${activeTab === 'pregadores' ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => setActiveTab('pregadores')}
+              >
+                <BookOpen size={18} /> Púlpito (Anciãos)
+              </button>
+            )}
             <button 
               className={`btn ${activeTab === 'musica' ? 'btn-primary' : 'btn-ghost'}`}
               onClick={() => setActiveTab('musica')}

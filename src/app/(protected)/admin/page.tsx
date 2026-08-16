@@ -61,6 +61,12 @@ export default function AdminDashboardPage() {
 
           {(isAdmin || isLeadership) && (
             <>
+              <Link href="/admin/usuarios" className="card" style={{ padding: 'var(--space-5)', textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div style={{ fontSize: '2rem' }}>🔑</div>
+                <h3 style={{ margin: 0 }}>Gerenciar Acessos</h3>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Controle os logins de diretores e liderança.</p>
+              </Link>
+
               <Link href="/admin/historico" className="card" style={{ padding: 'var(--space-5)', textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 <div style={{ fontSize: '2rem' }}>🕒</div>
                 <h3 style={{ margin: 0 }}>Histórico de Alterações</h3>
