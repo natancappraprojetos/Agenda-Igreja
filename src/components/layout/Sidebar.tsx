@@ -39,6 +39,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { person, roles, isAdmin, isLeadership, signOut } = useAuth();
   
   const isStrictLeader = roles.some(r => ['musica', 'sonoplastia', 'diacono'].includes(r));
+  const hasTeam = roles.some(r => ['musica', 'sonoplastia', 'diacono', 'anciao'].includes(r));
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -101,16 +102,29 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             </Link>
           ))}
 
-          {(isAdmin || isLeadership || isStrictLeader) && (
+          {(isAdmin || isLeadership || hasTeam) && (
             <>
               <div className="sidebar-section">
                 <div className="sidebar-section-title">Cadastros</div>
               </div>
 
               {cadastrosItems.map(item => {
-                // Strict Leaders só veem Pessoas e Escalas dentro de Cadastros
+                // Non-admins don't see global Pessoas. If they have a team, they see Minha Equipe instead.
+                if (!isAdmin && item.href === '/pessoas') {
+                  if (hasTeam) {
+                    return (
+                      <Link key="/equipe" href="/equipe" className={`sidebar-link ${isActive('/equipe') ? 'active' : ''}`} onClick={onClose}>
+                        <span className="sidebar-link-icon"><Users size={20} /></span>
+                        Minha Equipe
+                      </Link>
+                    );
+                  }
+                  return null;
+                }
+
+                // Strict Leaders só veem Minha Equipe e Escalas dentro de Cadastros
                 if (isStrictLeader && !isAdmin && !isLeadership) {
-                  if (item.href !== '/pessoas' && item.href !== '/escalas') return null;
+                  if (item.href !== '/escalas') return null;
                 }
                 
                 return (
