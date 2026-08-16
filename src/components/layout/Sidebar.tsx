@@ -37,6 +37,8 @@ const adminItems = [
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { person, roles, isAdmin, isLeadership, signOut } = useAuth();
+  
+  const isStrictLeader = roles.some(r => ['musica', 'sonoplastia', 'diacono'].includes(r));
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -74,7 +76,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         <nav className="sidebar-nav">
-          {navItems.map(item => (
+          {/* General Nav Items - Only for Admin and Liderança */}
+          {(isAdmin || isLeadership) && navItems.map(item => (
             <Link
               key={item.href}
               href={item.href}
@@ -86,21 +89,37 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             </Link>
           ))}
 
-          <div className="sidebar-section">
-            <div className="sidebar-section-title">Cadastros</div>
-          </div>
+          {(isAdmin || isLeadership) && (
+            <>
+              <div className="sidebar-section">
+                <div className="sidebar-section-title">Cadastros</div>
+              </div>
 
-          {cadastrosItems.map(item => (
+              {cadastrosItems.map(item => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`sidebar-link ${isActive(item.href) ? 'active' : ''}`}
+                  onClick={onClose}
+                >
+                  <span className="sidebar-link-icon">{item.icon}</span>
+                  {item.label}
+                </Link>
+              ))}
+            </>
+          )}
+
+          {/* Strict Leaders only see Escalas */}
+          {(!isAdmin && !isLeadership && isStrictLeader) && (
             <Link
-              key={item.href}
-              href={item.href}
-              className={`sidebar-link ${isActive(item.href) ? 'active' : ''}`}
+              href="/escalas"
+              className={`sidebar-link ${isActive('/escalas') ? 'active' : ''}`}
               onClick={onClose}
             >
-              <span className="sidebar-link-icon">{item.icon}</span>
-              {item.label}
+              <span className="sidebar-link-icon"><ClipboardList size={20} /></span>
+              Escalas
             </Link>
-          ))}
+          )}
 
           <Link
             href="/notificacoes"
@@ -111,9 +130,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             Notificações
           </Link>
 
-
-
-          {(isAdmin || isLeadership) && (
+          {/* Admin Items - ONLY Admin */}
+          {isAdmin && (
             <>
               <div className="sidebar-section">
                 <div className="sidebar-section-title">Administração</div>
