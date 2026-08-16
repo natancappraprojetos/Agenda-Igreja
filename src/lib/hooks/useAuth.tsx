@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { User, Person, AppRoleName, AuthContextType } from '@/lib/types';
 
@@ -13,6 +14,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [maxRoleLevel, setMaxRoleLevel] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const supabase = createClient();
+  const router = useRouter();
 
   const fetchUserData = useCallback(async (authUserId: string) => {
     try {
@@ -89,6 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPerson(null);
     setRoles([]);
     setMaxRoleLevel(0);
+    router.push('/login');
+    router.refresh();
   };
 
   return (
