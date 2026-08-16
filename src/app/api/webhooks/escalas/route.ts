@@ -21,14 +21,19 @@ export async function GET(request: Request) {
 
     const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
-    // Fetch the message template from settings
+    // Fetch all message templates from settings
     const { data: settingData } = await supabaseAdmin
       .from('system_settings')
-      .select('value')
-      .eq('key', 'whatsapp_schedule_template')
-      .single();
+      .select('key, value')
+      .like('key', 'whatsapp_template_%');
 
-    const templateText = settingData?.value || 'Olá {{nome}}! Você está escalado como {{funcao}} no {{evento}} do dia {{data}} às {{horario}}';
+    const templates = {
+      default: settingData?.find(s => s.key === 'whatsapp_template_default')?.value || 'Olá *{{nome}}*! Você está escalado(a) como *{{funcao}}* no *{{evento}}* do dia *{{data}}* às *{{horario}}*.',
+      pregador: settingData?.find(s => s.key === 'whatsapp_template_pregador')?.value || 'Olá *{{nome}}*! Você está escalado(a) para trazer a mensagem como *{{funcao}}* no *{{evento}}* do dia *{{data}}* às *{{horario}}*.',
+      musica: settingData?.find(s => s.key === 'whatsapp_template_musica')?.value || 'Olá *{{nome}}*! Lembrete do Louvor: você está escalado(a) como *{{funcao}}* no *{{evento}}* do dia *{{data}}* às *{{horario}}*.',
+      sonoplastia: settingData?.find(s => s.key === 'whatsapp_template_sonoplastia')?.value || 'Olá *{{nome}}*! Lembrete da equipe técnica: você está escalado(a) na *{{funcao}}* para o *{{evento}}* do dia *{{data}}* às *{{horario}}*.',
+      diaconato: settingData?.find(s => s.key === 'whatsapp_template_diaconato')?.value || 'Olá *{{nome}}*! Lembrete do Diaconato: você está escalado(a) como *{{funcao}}* no *{{evento}}* do dia *{{data}}* às *{{horario}}*.',
+    };
 
     const { data: events, error } = await supabaseAdmin
       .from('events')
@@ -67,6 +72,20 @@ export async function GET(request: Request) {
           const evento = event.title;
           const data = event.date.split('-').reverse().join('/'); // Format to DD/MM/YYYY
           const horario = event.start_time;
+
+          // Determine which template to use based on the role
+          let roleName = participant.role?.name?.toLowerCase() || '';
+          let templateText = templates.default;
+          
+          if (roleName.includes('pregador') || roleName.includes('mensagem')) {
+            templateText = templates.pregador;
+          } else if (roleName.includes('cantor') || roleName.includes('música') || roleName.includes('louvor') || roleName.includes('instrumentista')) {
+            templateText = templates.musica;
+          } else if (roleName.includes('sonoplast') || roleName.includes('áudio') || roleName.includes('som') || roleName.includes('multimídia') || roleName.includes('transmissão')) {
+            templateText = templates.sonoplastia;
+          } else if (roleName.includes('diácono') || roleName.includes('diaconisa') || roleName.includes('recepção')) {
+            templateText = templates.diaconato;
+          }
 
           let mensagem = templateText
             .replace(/\{\{nome\}\}/g, nome)

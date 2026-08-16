@@ -6,6 +6,7 @@ import { useToast } from '@/lib/hooks/useToast';
 import { Save } from 'lucide-react';
 
 export default function MensagensTab() {
+  const [selectedCategory, setSelectedCategory] = useState('whatsapp_template_default');
   const [template, setTemplate] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -13,20 +14,33 @@ export default function MensagensTab() {
   const { addToast } = useToast();
 
   useEffect(() => {
-    fetchTemplate();
-  }, []);
+    fetchTemplate(selectedCategory);
+  }, [selectedCategory]);
 
-  const fetchTemplate = async () => {
+  const fetchTemplate = async (category: string) => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('system_settings')
         .select('value')
-        .eq('key', 'whatsapp_schedule_template')
+        .eq('key', category)
         .single();
       
       if (error) {
         if (error.code !== 'PGRST116') { // not found
           console.error(error);
+        }
+        // Use fallbacks if not found
+        if (category === 'whatsapp_template_pregador') {
+          setTemplate('Olá *{{nome}}*! A Paz do Senhor!\n\nEste é um lembrete automático. Você está escalado(a) para trazer a mensagem da Palavra como *{{funcao}}* no *{{evento}}* do dia *{{data}}* às *{{horario}}*.\n\nOre por este momento! Deus te abençoe! 🙏');
+        } else if (category === 'whatsapp_template_musica') {
+          setTemplate('Olá *{{nome}}*! A Paz do Senhor!\n\nLembrete da escala de Louvor! Você está escalado(a) como *{{funcao}}* no *{{evento}}* do dia *{{data}}* às *{{horario}}*.\n\nNão esqueça de separar os hinos com antecedência! 🎵');
+        } else if (category === 'whatsapp_template_sonoplastia') {
+          setTemplate('Olá *{{nome}}*! A Paz do Senhor!\n\nLembrete da equipe técnica! Você está escalado(a) na *{{funcao}}* para o *{{evento}}* do dia *{{data}}* às *{{horario}}*.\n\nPor favor, chegue com 30 minutos de antecedência para ligar os equipamentos e testar os microfones! 🎛️');
+        } else if (category === 'whatsapp_template_diaconato') {
+          setTemplate('Olá *{{nome}}*! A Paz do Senhor!\n\nLembrete da escala do Diaconato! Você está escalado(a) como *{{funcao}}* no *{{evento}}* do dia *{{data}}* às *{{horario}}*.\n\nSe houver batismo neste dia, lembre-se de verificar as toalhas e a água! Que Deus abençoe seu serviço! 🛡️');
+        } else {
+          setTemplate('Olá *{{nome}}*! A Paz do Senhor!\n\nEste é um lembrete automático da secretaria da igreja.\nVocê está escalado(a) como *{{funcao}}* no *{{evento}}* do dia *{{data}}* às *{{horario}}*.\n\nQue Deus abençoe seu ministério! 🙏');
         }
         return;
       }
@@ -52,9 +66,9 @@ export default function MensagensTab() {
       const { error } = await supabase
         .from('system_settings')
         .upsert({
-          key: 'whatsapp_schedule_template',
+          key: selectedCategory,
           value: template,
-          description: 'Template de mensagem para envio pelo WhatsApp'
+          description: `Template de mensagem para ${selectedCategory}`
         });
 
       if (error) throw error;
@@ -91,6 +105,21 @@ export default function MensagensTab() {
           <Save size={18} />
           {saving ? 'Salvando...' : 'Salvar Template'}
         </button>
+      </div>
+
+      <div style={{ marginBottom: 'var(--space-6)', backgroundColor: 'var(--surface-hover)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)' }}>
+        <label className="form-label">Selecione para qual grupo deseja editar a mensagem:</label>
+        <select 
+          className="form-input" 
+          value={selectedCategory} 
+          onChange={(e) => setSelectedCategory(e.target.value)}
+        >
+          <option value="whatsapp_template_default">Geral / Padrão (Para quem não tem categoria)</option>
+          <option value="whatsapp_template_pregador">Pregadores (Pregação / Palavra)</option>
+          <option value="whatsapp_template_musica">Ministério da Música (Cantores / Banda)</option>
+          <option value="whatsapp_template_sonoplastia">Sonoplastia / Multimídia</option>
+          <option value="whatsapp_template_diaconato">Diaconato / Recepção</option>
+        </select>
       </div>
 
       <div style={{ marginBottom: 'var(--space-4)', display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
