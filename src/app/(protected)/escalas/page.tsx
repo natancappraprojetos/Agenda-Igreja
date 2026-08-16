@@ -9,9 +9,17 @@ import { BookOpen, Mic, Headset, Shield, CalendarIcon } from 'lucide-react';
 export default function EscalasPage() {
   const { roles, isAdmin } = useAuth();
   
+  const canSeeAll = isAdmin || roles.includes('anciao');
+  const canSeeMusica = canSeeAll || roles.includes('musica');
+  const canSeeSonoplastia = canSeeAll || roles.includes('sonoplastia');
+  const canSeeDiaconato = canSeeAll || roles.includes('diacono');
+  
   // Set initial tab based on permissions
   const [activeTab, setActiveTab] = useState<'pregadores' | 'musica' | 'sonoplastia' | 'diaconato'>(
-    isAdmin || roles.includes('anciao') ? 'pregadores' : 'musica'
+    canSeeAll ? 'pregadores' : 
+    roles.includes('musica') ? 'musica' :
+    roles.includes('sonoplastia') ? 'sonoplastia' : 
+    roles.includes('diacono') ? 'diaconato' : 'pregadores'
   );
 
   return (
@@ -21,35 +29,35 @@ export default function EscalasPage() {
       <div className="app-content">
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
           
-          {/* Tabs for Departments */}
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-6)', borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--space-2)', overflowX: 'auto' }}>
-            {(isAdmin || roles.includes('anciao')) && (
+          {/* Tabs for Departments - Only show if user has access to multiple */}
+          {canSeeAll && (
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-6)', borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--space-2)', overflowX: 'auto' }}>
               <button 
                 className={`btn ${activeTab === 'pregadores' ? 'btn-primary' : 'btn-ghost'}`}
                 onClick={() => setActiveTab('pregadores')}
               >
                 <BookOpen size={18} /> Púlpito (Anciãos)
               </button>
-            )}
-            <button 
-              className={`btn ${activeTab === 'musica' ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setActiveTab('musica')}
-            >
-              <Mic size={18} /> Ministério da Música
-            </button>
-            <button 
-              className={`btn ${activeTab === 'sonoplastia' ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setActiveTab('sonoplastia')}
-            >
-              <Headset size={18} /> Sonoplastia
-            </button>
-            <button 
-              className={`btn ${activeTab === 'diaconato' ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setActiveTab('diaconato')}
-            >
-              <Shield size={18} /> Diaconato
-            </button>
-          </div>
+              <button 
+                className={`btn ${activeTab === 'musica' ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => setActiveTab('musica')}
+              >
+                <Mic size={18} /> Ministério da Música
+              </button>
+              <button 
+                className={`btn ${activeTab === 'sonoplastia' ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => setActiveTab('sonoplastia')}
+              >
+                <Headset size={18} /> Sonoplastia
+              </button>
+              <button 
+                className={`btn ${activeTab === 'diaconato' ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => setActiveTab('diaconato')}
+              >
+                <Shield size={18} /> Diaconato
+              </button>
+            </div>
+          )}
 
           <div style={{ backgroundColor: 'var(--background-secondary)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-6)' }}>
             <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
@@ -61,7 +69,7 @@ export default function EscalasPage() {
             </p>
           </div>
 
-          {activeTab === 'pregadores' && (
+          {activeTab === 'pregadores' && canSeeAll && (
             <EscalasGrid 
               title="Escala de Pregadores" 
               icon={<BookOpen size={20} color="var(--primary)" />}
@@ -70,7 +78,7 @@ export default function EscalasPage() {
             />
           )}
 
-          {activeTab === 'musica' && (
+          {activeTab === 'musica' && canSeeMusica && (
             <EscalasGrid 
               title="Escala do Ministério da Música" 
               icon={<Mic size={20} color="var(--primary)" />}
@@ -79,17 +87,15 @@ export default function EscalasPage() {
             />
           )}
 
-          {activeTab === 'sonoplastia' && (
+          {activeTab === 'sonoplastia' && canSeeSonoplastia && (
             <EscalasGrid 
               title="Escala de Sonoplastia" 
               icon={<Headset size={20} color="var(--primary)" />}
-              // Não filtramos por tipo de evento específico, queremos TODOS os eventos (Pode ter Casamento, Reunião, etc)
-              // Deixando eventTypesToInclude vazio, ele vai pegar "Culto" por padrão como definimos no componente, mas você pode mudar para puxar todos se quiser.
               rolesToManage={['Sonoplasta']}
             />
           )}
 
-          {activeTab === 'diaconato' && (
+          {activeTab === 'diaconato' && canSeeDiaconato && (
             <EscalasGrid 
               title="Escala de Diaconato" 
               icon={<Shield size={20} color="var(--primary)" />}

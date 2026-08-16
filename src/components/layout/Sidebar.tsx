@@ -45,9 +45,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   const getRoleLabel = () => {
     if (roles.includes('admin')) return 'Administrador';
-    if (roles.includes('anciao')) return 'Liderança';
-    if (roles.includes('lider_ministerio')) return 'Líder de Ministério';
-    if (roles.includes('operacional')) return 'Operacional';
+    if (roles.includes('anciao')) return 'Ancião / Liderança';
+    if (roles.includes('diacono')) return 'Líder do Diaconato';
+    if (roles.includes('musica')) return 'Líder de Música';
+    if (roles.includes('sonoplastia')) return 'Líder de Sonoplastia';
     return 'Membro';
   };
 
