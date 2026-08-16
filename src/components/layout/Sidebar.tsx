@@ -30,6 +30,7 @@ const cadastrosItems = [
 ];
 
 const adminItems = [
+  { href: '/admin', icon: <LayoutDashboard size={20} />, label: 'Painel ADM' },
   { href: '/admin/configuracoes', icon: <Wrench size={20} />, label: 'Configurações' },
   { href: '/admin/historico', icon: <History size={20} />, label: 'Histórico' },
 ];
