@@ -76,8 +76,20 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         <nav className="sidebar-nav">
-          {/* General Nav Items - Only for Admin and Liderança */}
-          {(isAdmin || isLeadership) && navItems.map(item => (
+          {/* Agenda Geral is visible to everyone with at least strict leader access */}
+          {(isAdmin || isLeadership || isStrictLeader) && (
+            <Link
+              href="/"
+              className={`sidebar-link ${isActive('/') ? 'active' : ''}`}
+              onClick={onClose}
+            >
+              <span className="sidebar-link-icon"><CalendarDays size={20} /></span>
+              Agenda Geral
+            </Link>
+          )}
+
+          {/* Outros itens do navItems - Only for Admin and Liderança */}
+          {(isAdmin || isLeadership) && navItems.filter(item => item.href !== '/').map(item => (
             <Link
               key={item.href}
               href={item.href}
@@ -89,36 +101,31 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             </Link>
           ))}
 
-          {(isAdmin || isLeadership) && (
+          {(isAdmin || isLeadership || isStrictLeader) && (
             <>
               <div className="sidebar-section">
                 <div className="sidebar-section-title">Cadastros</div>
               </div>
 
-              {cadastrosItems.map(item => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`sidebar-link ${isActive(item.href) ? 'active' : ''}`}
-                  onClick={onClose}
-                >
-                  <span className="sidebar-link-icon">{item.icon}</span>
-                  {item.label}
-                </Link>
-              ))}
+              {cadastrosItems.map(item => {
+                // Strict Leaders só veem Pessoas e Escalas dentro de Cadastros
+                if (isStrictLeader && !isAdmin && !isLeadership) {
+                  if (item.href !== '/pessoas' && item.href !== '/escalas') return null;
+                }
+                
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`sidebar-link ${isActive(item.href) ? 'active' : ''}`}
+                    onClick={onClose}
+                  >
+                    <span className="sidebar-link-icon">{item.icon}</span>
+                    {item.label}
+                  </Link>
+                );
+              })}
             </>
-          )}
-
-          {/* Strict Leaders only see Escalas */}
-          {(!isAdmin && !isLeadership && isStrictLeader) && (
-            <Link
-              href="/escalas"
-              className={`sidebar-link ${isActive('/escalas') ? 'active' : ''}`}
-              onClick={onClose}
-            >
-              <span className="sidebar-link-icon"><ClipboardList size={20} /></span>
-              Escalas
-            </Link>
           )}
 
           <Link
