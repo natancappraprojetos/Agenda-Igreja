@@ -108,9 +108,8 @@ async function processarEscalas() {
         continue;
       }
 
-      // Prepara a mensagem
-      const dataFormatada = escala.data.split('-').reverse().join('/');
-      const msg = `Olá *${escala.nome}*! A Paz do Senhor!\n\nEste é um lembrete automático da secretaria da igreja.\nVocê está escalado(a) como *${escala.funcao}* no *${escala.evento}* do dia *${dataFormatada}* às *${escala.horario}*.\n\nQue Deus abençoe seu ministério! 🙏`;
+      // A mensagem já vem formatada do servidor!
+      const msg = escala.mensagem;
 
       try {
         const chat_id = formatarNumero(escala.whatsapp);

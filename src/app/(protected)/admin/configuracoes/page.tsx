@@ -8,9 +8,10 @@ import TiposEventoTab from './tabs/TiposEventoTab';
 import TiposLiturgiaTab from './tabs/TiposLiturgiaTab';
 import FuncoesTab from './tabs/FuncoesTab';
 import NecessidadesTab from './tabs/NecessidadesTab';
+import MensagensTab from './tabs/MensagensTab';
 
 export default function ConfiguracoesGeraisPage() {
-  const [activeTab, setActiveTab] = useState<'eventos' | 'funcoes' | 'liturgia' | 'liturgia_tipos' | 'necessidades'>('liturgia');
+  const [activeTab, setActiveTab] = useState<'eventos' | 'funcoes' | 'liturgia' | 'liturgia_tipos' | 'necessidades' | 'whatsapp'>('liturgia');
 
   return (
     <>
@@ -57,6 +58,14 @@ export default function ConfiguracoesGeraisPage() {
           >
             <Wrench size={18} /> Necessidades
           </button>
+
+          <button 
+            className={`btn ${activeTab === 'whatsapp' ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ borderRadius: 'var(--radius-md) var(--radius-md) 0 0', borderBottom: activeTab === 'whatsapp' ? 'none' : '' }}
+            onClick={() => setActiveTab('whatsapp')}
+          >
+            <Tags size={18} /> Mensagens WhatsApp
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -70,6 +79,7 @@ export default function ConfiguracoesGeraisPage() {
               <NecessidadesTab />
             </div>
           )}
+          {activeTab === 'whatsapp' && <MensagensTab />}
         </div>
 
       </div>

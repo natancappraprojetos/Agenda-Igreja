@@ -21,6 +21,15 @@ export async function GET(request: Request) {
 
     const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
+    // Fetch the message template from settings
+    const { data: settingData } = await supabaseAdmin
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'whatsapp_schedule_template')
+      .single();
+
+    const templateText = settingData?.value || 'Olá {{nome}}! Você está escalado como {{funcao}} no {{evento}} do dia {{data}} às {{horario}}';
+
     const { data: events, error } = await supabaseAdmin
       .from('events')
       .select(`
@@ -53,13 +62,27 @@ export async function GET(request: Request) {
     events?.forEach(event => {
       event.event_participants?.forEach((participant: any) => {
         if (participant.person?.whatsapp) {
+          const nome = participant.person.name;
+          const funcao = participant.role?.name || 'Escalado';
+          const evento = event.title;
+          const data = event.date.split('-').reverse().join('/'); // Format to DD/MM/YYYY
+          const horario = event.start_time;
+
+          let mensagem = templateText
+            .replace(/\{\{nome\}\}/g, nome)
+            .replace(/\{\{funcao\}\}/g, funcao)
+            .replace(/\{\{evento\}\}/g, evento)
+            .replace(/\{\{data\}\}/g, data)
+            .replace(/\{\{horario\}\}/g, horario);
+
           notifications.push({
-            nome: participant.person.name,
+            nome: nome,
             whatsapp: participant.person.whatsapp,
-            funcao: participant.role?.name || 'Escalado',
-            evento: event.title,
-            data: event.date,
-            horario: event.start_time
+            funcao: funcao,
+            evento: evento,
+            data: event.date, // keep original date format for unique IDs
+            horario: horario,
+            mensagem: mensagem
           });
         }
       });
