@@ -6,6 +6,7 @@ import Link from 'next/link';
 import type { EventType, Location, Ministry } from '@/lib/types';
 import { useToast } from '@/lib/hooks/useToast';
 import PersonSelect from '@/components/ui/PersonSelect';
+import PersonAutocomplete from '@/components/ui/PersonAutocomplete';
 
 const TOTAL_STEPS = 8;
 
