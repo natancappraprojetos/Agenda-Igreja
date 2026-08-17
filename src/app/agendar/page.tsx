@@ -216,13 +216,33 @@ export default function PublicAgendarWizard() {
       
       if (isCulto && ministryId) {
          const responsabilidades = [];
-         if (preacherOption === 'ministerio') responsabilidades.push(`- Pregação: ${preacherName || 'A definir pelo ministério'}`);
-         if (worshipOption === 'ministerio') responsabilidades.push(`- Louvor: ${worshipLeaderName || 'A definir pelo ministério'}`);
-         if (ofertasOption === 'ministerio') responsabilidades.push(`- Ofertas: ${ofertasName || 'A definir pelo ministério'}`);
-         if (historiaOption === 'ministerio') responsabilidades.push(`- História: ${historiaName || 'A definir pelo ministério'}`);
+         
+         if (preacherOption === 'ministerio') {
+            responsabilidades.push(`- Pregação: Nosso ministério fará`);
+         } else if (preacherOption === 'igreja' && preacherName && !preacherId) {
+            responsabilidades.push(`- Pregação: ${preacherName}`);
+         }
+         
+         if (worshipOption === 'ministerio') {
+            responsabilidades.push(`- Louvor: Nosso ministério fará`);
+         } else if (worshipOption === 'igreja' && worshipLeaderName && !worshipLeaderId) {
+            responsabilidades.push(`- Louvor: ${worshipLeaderName}`);
+         }
+         
+         if (ofertasOption === 'ministerio') {
+            responsabilidades.push(`- Ofertas: Nosso ministério fará`);
+         } else if (ofertasOption === 'igreja' && ofertasName && !ofertasId) {
+            responsabilidades.push(`- Ofertas: ${ofertasName}`);
+         }
+         
+         if (historiaOption === 'ministerio') {
+            responsabilidades.push(`- História: Nosso ministério fará`);
+         } else if (historiaOption === 'igreja' && historiaName && !historiaId) {
+            responsabilidades.push(`- História: ${historiaName}`);
+         }
          
          if (responsabilidades.length > 0) {
-            finalNotes += (finalNotes ? '\n\n' : '') + `Responsabilidades assumidas pelo ministério:\n${responsabilidades.join('\n')}`;
+            finalNotes += (finalNotes ? '\n\n' : '') + `Detalhes da Programação:\n${responsabilidades.join('\n')}`;
          }
       }
 
@@ -539,19 +559,18 @@ export default function PublicAgendarWizard() {
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
                     <button 
                       className={`btn ${preacherOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} 
-                      onClick={() => setPreacherOption('ministerio')}
+                      onClick={() => { setPreacherOption('ministerio'); setPreacherId(''); setPreacherName(''); }}
                     >Nosso Ministério fará</button>
                     <button 
                       className={`btn ${preacherOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} 
                       onClick={() => { setPreacherOption('igreja'); setPreacherId(''); setPreacherName(''); }}
                     >Liderança da Igreja define</button>
                   </div>
-                  {preacherOption === 'ministerio' && (
+                  {preacherOption === 'igreja' && (
                     <div style={{ marginTop: 'var(--space-2)' }}>
-                      <PersonSelect 
-                        value={preacherId} 
-                        onChange={(val, person) => { setPreacherId(val || ''); setPreacherName(person?.name || ''); }} 
-                        placeholder="Nome do pregador (opcional, pode deixar em branco se não souber)" 
+                      <PersonAutocomplete 
+                        onSelect={(person, name) => { setPreacherId(person?.id || ''); setPreacherName(person?.name || name); }} 
+                        placeholder="Nome (opcional)" 
                       />
                     </div>
                   )}
@@ -562,19 +581,18 @@ export default function PublicAgendarWizard() {
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
                     <button 
                       className={`btn ${worshipOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} 
-                      onClick={() => setWorshipOption('ministerio')}
+                      onClick={() => { setWorshipOption('ministerio'); setWorshipLeaderId(''); setWorshipLeaderName(''); }}
                     >Nosso Ministério fará</button>
                     <button 
                       className={`btn ${worshipOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} 
                       onClick={() => { setWorshipOption('igreja'); setWorshipLeaderId(''); setWorshipLeaderName(''); }}
                     >Equipe de Música Oficial</button>
                   </div>
-                  {worshipOption === 'ministerio' && (
+                  {worshipOption === 'igreja' && (
                     <div style={{ marginTop: 'var(--space-2)' }}>
-                      <PersonSelect 
-                        value={worshipLeaderId} 
-                        onChange={(val, person) => { setWorshipLeaderId(val || ''); setWorshipLeaderName(person?.name || ''); }} 
-                        placeholder="Nome do líder de louvor (opcional)" 
+                      <PersonAutocomplete 
+                        onSelect={(person, name) => { setWorshipLeaderId(person?.id || ''); setWorshipLeaderName(person?.name || name); }} 
+                        placeholder="Nome (opcional)" 
                       />
                     </div>
                   )}
@@ -585,19 +603,18 @@ export default function PublicAgendarWizard() {
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
                     <button 
                       className={`btn ${ofertasOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} 
-                      onClick={() => setOfertasOption('ministerio')}
+                      onClick={() => { setOfertasOption('ministerio'); setOfertasId(''); setOfertasName(''); }}
                     >Nosso Ministério fará</button>
                     <button 
                       className={`btn ${ofertasOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} 
                       onClick={() => { setOfertasOption('igreja'); setOfertasId(''); setOfertasName(''); }}
-                    >Diaconato Oficial fará</button>
+                    >Liderança da Igreja define</button>
                   </div>
-                  {ofertasOption === 'ministerio' && (
+                  {ofertasOption === 'igreja' && (
                     <div style={{ marginTop: 'var(--space-2)' }}>
-                      <PersonSelect 
-                        value={ofertasId} 
-                        onChange={(val, person) => { setOfertasId(val || ''); setOfertasName(person?.name || ''); }} 
-                        placeholder="Nome do ofertante (opcional)" 
+                      <PersonAutocomplete 
+                        onSelect={(person, name) => { setOfertasId(person?.id || ''); setOfertasName(person?.name || name); }} 
+                        placeholder="Nome (opcional)" 
                       />
                     </div>
                   )}
@@ -608,19 +625,18 @@ export default function PublicAgendarWizard() {
                   <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
                     <button 
                       className={`btn ${historiaOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} 
-                      onClick={() => setHistoriaOption('ministerio')}
+                      onClick={() => { setHistoriaOption('ministerio'); setHistoriaId(''); setHistoriaName(''); }}
                     >Nosso Ministério fará</button>
                     <button 
                       className={`btn ${historiaOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} 
                       onClick={() => { setHistoriaOption('igreja'); setHistoriaId(''); setHistoriaName(''); }}
-                    >Ministério da Criança Oficial</button>
+                    >Liderança da Igreja define</button>
                   </div>
-                  {historiaOption === 'ministerio' && (
+                  {historiaOption === 'igreja' && (
                     <div style={{ marginTop: 'var(--space-2)' }}>
-                      <PersonSelect 
-                        value={historiaId} 
-                        onChange={(val, person) => { setHistoriaId(val || ''); setHistoriaName(person?.name || ''); }} 
-                        placeholder="Nome do contador da história (opcional)" 
+                      <PersonAutocomplete 
+                        onSelect={(person, name) => { setHistoriaId(person?.id || ''); setHistoriaName(person?.name || name); }} 
+                        placeholder="Nome (opcional)" 
                       />
                     </div>
                   )}
