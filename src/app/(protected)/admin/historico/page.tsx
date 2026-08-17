@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Header from '@/components/layout/Header';
+import ProtectedRoute from '@/components/ui/ProtectedRoute';
 import { useAuth } from '@/lib/hooks/useAuth';
 
 interface HistoryLog {
@@ -85,13 +86,17 @@ export default function HistoricoPage() {
         return `Participante (Escala)`;
       case 'liturgy_items':
         return `Item da Liturgia: ${details.title || 'Desconhecido'}`;
+      case 'person_roles':
+        return `Membro da Equipe`;
+      case 'people':
+        return `Cadastro de Pessoa: ${details.name || 'Desconhecido'}`;
       default:
         return type;
     }
   };
 
   return (
-    <>
+    <ProtectedRoute requireAdmin>
       <Header title="Histórico de Alterações" onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
       <div className="app-content">
         <h1 style={{ fontSize: '1.5rem', marginBottom: 'var(--space-2)' }}>Log de Auditoria</h1>
@@ -142,6 +147,6 @@ export default function HistoricoPage() {
           </div>
         )}
       </div>
-    </>
+    </ProtectedRoute>
   );
 }

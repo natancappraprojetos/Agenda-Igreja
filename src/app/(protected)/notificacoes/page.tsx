@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import Header from '@/components/layout/Header';
-import { Bell, CheckCircle, Info, AlertTriangle, Calendar } from 'lucide-react';
+import { Bell, CheckCircle, Info, AlertTriangle, Calendar, Users } from 'lucide-react';
 import { useToast } from '@/lib/hooks/useToast';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 interface Notification {
   id: string;
@@ -19,21 +20,72 @@ interface Notification {
 export default function NotificacoesPage() {
   const supabase = createClient();
   const { addToast } = useToast();
+  const { roles, user } = useAuth();
   
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchNotifications = async () => {
     setLoading(true);
-    // Para simplificar, buscamos as notificações mais recentes. 
-    // Em um cenário real com RLS, o supabase traria apenas as do usuário atual.
-    const { data } = await supabase
+    let allNotifications: Notification[] = [];
+
+    // 1. Fetch from notifications table (static notifications)
+    const { data: staticData } = await supabase
       .from('notifications')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50);
       
-    if (data) setNotifications(data as Notification[]);
+    if (staticData) {
+      allNotifications = [...(staticData as Notification[])];
+    }
+
+    // 2. Fetch from event_pendencies to generate dynamic notifications based on user roles
+    if (roles.length > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      const { data: pendencies } = await supabase
+        .from('event_pendencies')
+        .select('*')
+        .gte('date', today)
+        .order('date', { ascending: true });
+
+      if (pendencies) {
+        pendencies.forEach(event => {
+          let missingRoles = [];
+
+          if (roles.includes('sonoplastia') && event.has_sound === false) {
+            missingRoles.push('Sonoplastia');
+          }
+          if (roles.includes('diacono') && event.has_deaconry === false) {
+            missingRoles.push('Diaconato');
+          }
+          if (roles.includes('musica') && event.has_worship_leader === false) {
+            missingRoles.push('Louvor/Música');
+          }
+          if (roles.includes('anciao') && event.has_preacher === false) {
+            missingRoles.push('Pregador(a)');
+          }
+
+          if (missingRoles.length > 0) {
+            const eventDateStr = new Date(event.date).toLocaleDateString('pt-BR');
+            allNotifications.push({
+              id: `pendency-${event.event_id}-${missingRoles.join('-')}`,
+              type: 'pending_scale',
+              title: `Escala Pendente - ${event.event_type}`,
+              message: `O evento do dia ${eventDateStr} (${event.start_time.substring(0,5)}) precisa de pessoas para: ${missingRoles.join(', ')}. Acesse "Escalas" para definir.`,
+              event_id: event.event_id,
+              is_read: false, // Pendências dinâmicas sempre aparecem como não lidas até serem resolvidas
+              created_at: new Date(event.date).toISOString() // Usa a data do evento para ordenação
+            });
+          }
+        });
+      }
+    }
+
+    // Ordenar todas juntas (mais recentes primeiro)
+    allNotifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    
+    setNotifications(allNotifications);
     setLoading(false);
   };
 
@@ -64,6 +116,7 @@ export default function NotificacoesPage() {
       case 'schedule': return <Calendar size={20} color="var(--primary)" />;
       case 'conflict': return <AlertTriangle size={20} color="var(--danger)" />;
       case 'change': return <Info size={20} color="var(--warning)" />;
+      case 'pending_scale': return <Users size={20} color="var(--danger)" />;
       default: return <Bell size={20} color="var(--text-secondary)" />;
     }
   };
@@ -128,13 +181,19 @@ export default function NotificacoesPage() {
                       </div>
                       {!n.is_read && (
                         <div style={{ marginTop: 'var(--space-2)' }}>
-                          <button 
-                            className="btn btn-ghost btn-sm" 
-                            style={{ padding: '4px 8px', fontSize: '0.8rem', color: 'var(--primary)' }}
-                            onClick={() => markAsRead(n.id)}
-                          >
-                            Marcar como lida
-                          </button>
+                          {n.type === 'pending_scale' ? (
+                            <span style={{ fontSize: '0.8rem', color: 'var(--danger)', fontWeight: 600 }}>
+                              Pendência de Escala (Resolva para limpar esta notificação)
+                            </span>
+                          ) : (
+                            <button 
+                              className="btn btn-ghost btn-sm" 
+                              style={{ padding: '4px 8px', fontSize: '0.8rem', color: 'var(--primary)' }}
+                              onClick={() => markAsRead(n.id)}
+                            >
+                              Marcar como lida
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>

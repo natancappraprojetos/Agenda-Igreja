@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/lib/hooks/useToast';
 import Header from '@/components/layout/Header';
 import Modal from '@/components/ui/Modal';
+import ProtectedRoute from '@/components/ui/ProtectedRoute';
 import { useRouter } from 'next/navigation';
 import type { Ministry } from '@/lib/types';
 
@@ -56,7 +57,7 @@ export default function MinisteriosPage() {
   };
 
   return (
-    <>
+    <ProtectedRoute requireLeadership>
       <Header title="Ministérios" onMenuToggle={() => {}}>
         <button className="btn btn-primary btn-sm" onClick={() => { resetForm(); setModalOpen(true); }}>
           ➕ Novo Ministério
@@ -113,6 +114,6 @@ export default function MinisteriosPage() {
           </div>
         </Modal>
       </div>
-    </>
+    </ProtectedRoute>
   );
 }

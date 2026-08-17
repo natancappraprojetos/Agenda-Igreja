@@ -375,7 +375,7 @@ export default function MinisterioDetalhesPage() {
               <label className="form-label">Pessoa *</label>
               <PersonSelect 
                 value={newPersonId} 
-                onChange={setNewPersonId} 
+                onChange={val => setNewPersonId(val || '')} 
                 placeholder="Busque pelo nome..." 
               />
             </div>

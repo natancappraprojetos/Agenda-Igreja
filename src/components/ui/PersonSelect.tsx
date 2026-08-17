@@ -8,13 +8,13 @@ import type { Person } from '@/lib/types';
 
 interface PersonSelectProps {
   value: string; // person_id
-  onChange: (personId: string) => void;
+  onChange: (personId: string | null, person?: Person | null) => void;
   placeholder?: string;
   label?: string;
   roleId?: string; // Optional: filter by role
 }
 
-export default function PersonSelect({ value, onChange, placeholder = 'Selecione uma pessoa', label }: PersonSelectProps) {
+export default function PersonSelect({ value, onChange, placeholder = 'Selecione uma pessoa', label, roleId }: PersonSelectProps) {
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -36,12 +36,26 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
       setLoading(true);
       let query = supabase.from('people').select('*').eq('is_active', true).order('name');
       
+      if (roleId) {
+        const { data: prData } = await supabase.from('person_roles').select('person_id').eq('role_id', roleId);
+        if (prData && prData.length > 0) {
+          const personIds = prData.map(pr => pr.person_id);
+          query = query.in('id', personIds);
+        } else {
+          setPeople([]);
+          setLoading(false);
+          return;
+        }
+      }
+      
       const { data } = await query;
       if (data) setPeople(data as Person[]);
       setLoading(false);
     };
-    fetchPeople();
-  }, [supabase]);
+    if (isOpen) {
+      fetchPeople();
+    }
+  }, [supabase, roleId, isOpen]);
 
   // Click outside to close dropdown
   useEffect(() => {
@@ -65,22 +79,57 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
     
     setSavingNew(true);
     try {
-      const { data, error } = await supabase
-        .from('people')
-        .insert({ name: newName.trim(), whatsapp: newWhatsapp.trim() || null })
-        .select()
-        .single();
-        
-      if (error) throw error;
+      let finalData = null;
       
-      if (data) {
-        setPeople(prev => [...prev, data as Person].sort((a, b) => a.name.localeCompare(b.name)));
-        onChange(data.id);
+      // Check if person exists
+      const { data: existing } = await supabase
+        .from('people')
+        .select('*')
+        .ilike('name', newName.trim())
+        .limit(1)
+        .maybeSingle();
+
+      if (existing) {
+        finalData = existing;
+      } else {
+        const { data, error } = await supabase
+          .from('people')
+          .insert({ name: newName.trim(), whatsapp: newWhatsapp.trim() || null })
+          .select()
+          .single();
+        if (error) throw error;
+        finalData = data;
+      }
+        
+      if (finalData) {
+        if (roleId) {
+          // Verify if not already linked
+          const { data: linkExists } = await supabase
+            .from('person_roles')
+            .select('id')
+            .eq('person_id', finalData.id)
+            .eq('role_id', roleId)
+            .maybeSingle();
+            
+          if (!linkExists) {
+            await supabase.from('person_roles').insert({ person_id: finalData.id, role_id: roleId });
+          }
+        }
+        
+        // Add to local state if not exists
+        setPeople(prev => {
+          if (!prev.find(p => p.id === finalData.id)) {
+            return [...prev, finalData as Person].sort((a, b) => a.name.localeCompare(b.name));
+          }
+          return prev;
+        });
+        
+        onChange(finalData.id, finalData as Person);
         setIsModalOpen(false);
         setIsOpen(false);
         setNewName('');
         setNewWhatsapp('');
-        addToast({ type: 'success', title: 'Pessoa cadastrada e selecionada!' });
+        addToast({ type: 'success', title: 'Pessoa cadastrada e vinculada à função!' });
       }
     } catch (err) {
       addToast({ type: 'error', title: 'Erro ao cadastrar pessoa' });
@@ -92,20 +141,52 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
   const handleFastCreate = async (name: string) => {
     setSavingNew(true);
     try {
-      const { data, error } = await supabase
-        .from('people')
-        .insert({ name: name.trim() })
-        .select()
-        .single();
-        
-      if (error) throw error;
+      let finalData = null;
       
-      if (data) {
-        setPeople(prev => [...prev, data as Person].sort((a, b) => a.name.localeCompare(b.name)));
-        onChange(data.id);
+      const { data: existing } = await supabase
+        .from('people')
+        .select('*')
+        .ilike('name', name.trim())
+        .limit(1)
+        .maybeSingle();
+        
+      if (existing) {
+        finalData = existing;
+      } else {
+        const { data, error } = await supabase
+          .from('people')
+          .insert({ name: name.trim() })
+          .select()
+          .single();
+        if (error) throw error;
+        finalData = data;
+      }
+      
+      if (finalData) {
+        if (roleId) {
+          const { data: linkExists } = await supabase
+            .from('person_roles')
+            .select('id')
+            .eq('person_id', finalData.id)
+            .eq('role_id', roleId)
+            .maybeSingle();
+            
+          if (!linkExists) {
+            await supabase.from('person_roles').insert({ person_id: finalData.id, role_id: roleId });
+          }
+        }
+        
+        setPeople(prev => {
+          if (!prev.find(p => p.id === finalData.id)) {
+            return [...prev, finalData as Person].sort((a, b) => a.name.localeCompare(b.name));
+          }
+          return prev;
+        });
+        
+        onChange(finalData.id, finalData as Person);
         setIsOpen(false);
         setSearchTerm('');
-        addToast({ type: 'success', title: 'Pessoa adicionada com sucesso!' });
+        addToast({ type: 'success', title: 'Pessoa adicionada e vinculada à função!' });
       }
     } catch (err) {
       addToast({ type: 'error', title: 'Erro ao cadastrar pessoa' });
@@ -121,7 +202,7 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
   };
 
   return (
-    <div className="form-group" style={{ position: 'relative', zIndex: 100 }} ref={dropdownRef}>
+    <div className="form-group" style={{ position: 'relative', zIndex: isOpen ? 1000 : 10 }} ref={dropdownRef}>
       {label && <label className="form-label">{label}</label>}
       
       <div 
@@ -164,6 +245,25 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
               <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-secondary)' }}>Carregando...</div>
             ) : (
               <>
+                {value && (
+                  <div 
+                    className="dropdown-item"
+                    onClick={() => {
+                      onChange(null, null);
+                      setIsOpen(false);
+                      setSearchTerm('');
+                    }}
+                    style={{
+                      padding: '10px 12px',
+                      cursor: 'pointer',
+                      color: 'var(--text-danger)',
+                      borderBottom: '1px solid var(--border)',
+                      fontWeight: 600
+                    }}
+                  >
+                    🗑️ Limpar seleção
+                  </div>
+                )}
                 {filteredPeople.map(person => (
                   <div 
                     key={person.id}
@@ -173,7 +273,7 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
                       borderBottom: '1px solid var(--border)',
                       fontWeight: value === person.id ? 600 : 400
                     }}
-                    onClick={() => { onChange(person.id); setIsOpen(false); setSearchTerm(''); }}
+                    onClick={() => { onChange(person.id, person); setIsOpen(false); setSearchTerm(''); }}
                   >
                     {person.name}
                   </div>

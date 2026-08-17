@@ -6,9 +6,9 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useToast } from '@/lib/hooks/useToast';
 import Header from '@/components/layout/Header';
 import Modal from '@/components/ui/Modal';
-import PersonSelect from '@/components/ui/PersonSelect';
+import PersonAutocomplete from '@/components/ui/PersonAutocomplete';
 import { Users, Trash2, Shield } from 'lucide-react';
-import type { Role, PersonRole } from '@/lib/types';
+import type { Role, Person } from '@/lib/types';
 
 export default function EquipePage() {
   const { roles } = useAuth();
@@ -20,7 +20,9 @@ export default function EquipePage() {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   
   const [modalOpen, setModalOpen] = useState(false);
-  const [newPersonId, setNewPersonId] = useState('');
+  const [newPersonId, setNewPersonId] = useState<string | null>(null);
+  const [newPersonName, setNewPersonName] = useState('');
+  const [newPersonWhatsapp, setNewPersonWhatsapp] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -30,7 +32,7 @@ export default function EquipePage() {
     if (roles.includes('sonoplastia')) rolesToManage.push('Sonoplasta');
     if (roles.includes('diacono')) rolesToManage.push('Diácono', 'Diaconisa', 'Diácono/Diaconisa');
     if (roles.includes('musica')) rolesToManage.push('Cantor(a) Solo', 'Cantor(a) Congregacional', 'Instrumentista', 'Líder de Louvor', 'Cantor', 'Pianista', 'Violonista');
-    if (roles.includes('anciao')) rolesToManage.push('Pregador', 'Pregador(a)', 'Ancião');
+    if (roles.includes('anciao')) rolesToManage.push('Pregador', 'Pregador(a)', 'Ancião', 'Sonoplasta', 'Líder de Louvor', 'Diretor');
     return rolesToManage;
   }, [roles]);
 
@@ -77,8 +79,8 @@ export default function EquipePage() {
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPersonId) {
-      addToast({ type: 'error', title: 'Selecione uma pessoa' });
+    if (!newPersonName.trim()) {
+      addToast({ type: 'error', title: 'Informe o nome da pessoa' });
       return;
     }
     if (!selectedRoleId) {
@@ -88,8 +90,34 @@ export default function EquipePage() {
 
     setSaving(true);
     try {
+      let finalPersonId = newPersonId;
+
+      // Se a pessoa não foi selecionada da lista (nova pessoa), precisamos criá-la
+      if (!finalPersonId) {
+        // Primeiro verifica se a pessoa existe pelo nome (case insensitive) para evitar duplicatas
+        const { data: existing } = await supabase
+          .from('people')
+          .select('*')
+          .ilike('name', newPersonName.trim())
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) {
+          finalPersonId = existing.id;
+        } else {
+          const { data: newPerson, error: createError } = await supabase
+            .from('people')
+            .insert({ name: newPersonName.trim(), whatsapp: newPersonWhatsapp.trim() || null })
+            .select()
+            .single();
+            
+          if (createError) throw createError;
+          finalPersonId = newPerson.id;
+        }
+      }
+
       const { error } = await supabase.from('person_roles').insert({
-        person_id: newPersonId,
+        person_id: finalPersonId,
         role_id: selectedRoleId
       });
 
@@ -99,10 +127,13 @@ export default function EquipePage() {
       } else {
         addToast({ type: 'success', title: 'Membro adicionado à equipe!' });
         setModalOpen(false);
-        setNewPersonId('');
+        setNewPersonId(null);
+        setNewPersonName('');
+        setNewPersonWhatsapp('');
         fetchData();
       }
     } catch (err) {
+      console.error(err);
       addToast({ type: 'error', title: 'Erro ao adicionar membro' });
     } finally {
       setSaving(false);
@@ -209,20 +240,35 @@ export default function EquipePage() {
             )}
             
             <div className="form-group">
-              <label className="form-label">Buscar Pessoa *</label>
-              <PersonSelect 
-                value={newPersonId} 
-                onChange={setNewPersonId} 
-                placeholder="Busque pelo nome ou cadastre..." 
+              <PersonAutocomplete 
+                label="Nome da Pessoa *"
+                placeholder="Nome completo..."
+                onSelect={(person, name) => {
+                  setNewPersonName(name);
+                  if (person) {
+                    setNewPersonId(person.id);
+                    if (person.whatsapp) setNewPersonWhatsapp(person.whatsapp);
+                  } else {
+                    setNewPersonId(null);
+                  }
+                }}
               />
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'block', marginTop: 'var(--space-2)' }}>
-                Dica: Se a pessoa não existir no sistema, você pode adicioná-la rapidamente clicando em "Cadastrar novo".
-              </span>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">WhatsApp (Opcional)</label>
+              <input 
+                type="text" 
+                className="form-input" 
+                value={newPersonWhatsapp} 
+                onChange={e => setNewPersonWhatsapp(e.target.value)}
+                placeholder="(DD) 90000-0000" 
+              />
             </div>
 
             <div className="modal-actions" style={{ marginTop: 'var(--space-6)' }}>
-              <button type="button" className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancelar</button>
-              <button type="submit" className="btn btn-primary" disabled={saving || !newPersonId}>
+              <button type="button" className="btn btn-secondary" onClick={() => { setModalOpen(false); setNewPersonId(null); setNewPersonName(''); setNewPersonWhatsapp(''); }}>Cancelar</button>
+              <button type="submit" className="btn btn-primary" disabled={saving || !newPersonName.trim()}>
                 {saving ? 'Adicionando...' : 'Adicionar à Equipe'}
               </button>
             </div>

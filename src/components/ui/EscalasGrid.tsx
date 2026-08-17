@@ -123,13 +123,13 @@ export default function EscalasGrid({ title, icon, eventTypesToInclude, rolesToM
   if (loading) return <div style={{ padding: 'var(--space-4)', textAlign: 'center' }}>Carregando escalas...</div>;
 
   return (
-    <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 'var(--space-6)' }}>
+    <div className="card" style={{ padding: 0, marginBottom: 'var(--space-6)' }}>
       <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
         {icon}
         <h2 style={{ margin: 0, fontSize: '1.1rem' }}>{title}</h2>
       </div>
       
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{ overflowX: 'auto', paddingBottom: '150px' }}>
         <table className="data-table" style={{ width: '100%', minWidth: '600px' }}>
           <thead>
             <tr>
@@ -184,6 +184,7 @@ export default function EscalasGrid({ title, icon, eventTypesToInclude, rolesToM
                             value={currentAssignee?.person_id || ''}
                             onChange={(personId) => handleAssignPerson(event.id, roleName, personId)}
                             placeholder="Definir..."
+                            roleId={roleId}
                           />
                         </td>
                       );

@@ -246,7 +246,7 @@ export default function EventoDetalhesPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
               <div>
                 <p className="form-label">Data e Hora</p>
-                <p style={{ fontWeight: 600 }}>{new Date(event.date).toLocaleDateString('pt-BR')} às {event.start_time.substring(0, 5)}</p>
+                <p style={{ fontWeight: 600 }}>{new Date(event.date).toLocaleDateString('pt-BR')} • {event.start_time.substring(0, 5)}{event.end_time ? ` às ${event.end_time.substring(0, 5)}` : ''}</p>
               </div>
               <div>
                 <p className="form-label">Local</p>
@@ -300,7 +300,7 @@ export default function EventoDetalhesPage() {
                   <PersonSelect 
                     label="Pessoa (Busque ou cadastre)" 
                     value={newParticipantPersonId} 
-                    onChange={setNewParticipantPersonId} 
+                    onChange={val => setNewParticipantPersonId(val || '')} 
                   />
                 </div>
                 <button className="btn btn-primary" onClick={handleAddParticipant}>Adicionar</button>

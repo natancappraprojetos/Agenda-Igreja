@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/lib/hooks/useToast';
 import Header from '@/components/layout/Header';
 import Modal from '@/components/ui/Modal';
+import ProtectedRoute from '@/components/ui/ProtectedRoute';
 import { Users, Mail, Phone } from 'lucide-react';
 import type { Person } from '@/lib/types';
 
@@ -125,7 +126,7 @@ export default function PessoasPage() {
   };
 
   return (
-    <>
+    <ProtectedRoute requireAdmin>
       <Header title="Cadastro de Pessoas" onMenuToggle={() => {}}>
         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
           <button className="btn btn-secondary btn-sm" onClick={() => setImportModalOpen(true)}>
@@ -256,6 +257,6 @@ export default function PessoasPage() {
           </div>
         </Modal>
       </div>
-    </>
+    </ProtectedRoute>
   );
 }

@@ -185,13 +185,13 @@ export default function LiturgyEditor({ eventId, eventStartTime, itemTypes }: Li
           <PersonSelect 
             label="Responsável (Opcional)" 
             value={newItemPersonId} 
-            onChange={setNewItemPersonId} 
+            onChange={val => setNewItemPersonId(val || '')} 
           />
 
           <SongSelect 
             label="Música (Opcional)" 
             value={newItemSongId} 
-            onChange={setNewItemSongId} 
+            onChange={val => setNewItemSongId(val || '')} 
           />
 
           <button className="btn btn-primary" onClick={handleAddItem} style={{ marginTop: 'var(--space-2)' }}>

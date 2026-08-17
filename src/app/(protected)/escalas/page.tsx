@@ -73,7 +73,7 @@ export default function EscalasPage() {
             <EscalasGrid 
               title="Escala de Pregadores" 
               icon={<BookOpen size={20} color="var(--primary)" />}
-              eventTypesToInclude={['Culto de Sábado', 'Culto de Quarta', 'Culto de Domingo']}
+              eventTypesToInclude={['Culto', 'Programa Jovem', 'Desbravadores', 'Batismo', 'Evento Especial']}
               rolesToManage={['Pregador(a)']}
             />
           )}
@@ -82,7 +82,7 @@ export default function EscalasPage() {
             <EscalasGrid 
               title="Escala do Ministério da Música" 
               icon={<Mic size={20} color="var(--primary)" />}
-              eventTypesToInclude={['Culto de Sábado', 'Culto de Quarta', 'Culto de Domingo', 'Programa Jovem']}
+              eventTypesToInclude={['Culto', 'Programa Jovem', 'Desbravadores', 'Batismo', 'Evento Especial']}
               rolesToManage={['Cantor(a) Solo', 'Cantor(a) Congregacional']}
             />
           )}
@@ -91,6 +91,7 @@ export default function EscalasPage() {
             <EscalasGrid 
               title="Escala de Sonoplastia" 
               icon={<Headset size={20} color="var(--primary)" />}
+              eventTypesToInclude={['Culto', 'Programa Jovem', 'Desbravadores', 'Batismo', 'Evento Especial']}
               rolesToManage={['Sonoplasta']}
             />
           )}
@@ -99,6 +100,7 @@ export default function EscalasPage() {
             <EscalasGrid 
               title="Escala de Diaconato" 
               icon={<Shield size={20} color="var(--primary)" />}
+              eventTypesToInclude={['Culto', 'Programa Jovem', 'Desbravadores', 'Batismo', 'Evento Especial']}
               rolesToManage={['Diácono/Diaconisa']}
             />
           )}

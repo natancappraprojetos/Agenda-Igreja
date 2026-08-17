@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/lib/hooks/useToast';
 import Header from '@/components/layout/Header';
 import Modal from '@/components/ui/Modal';
+import ProtectedRoute from '@/components/ui/ProtectedRoute';
 import { MapPin } from 'lucide-react';
 
 interface Location {
@@ -89,7 +90,7 @@ export default function LocaisPage() {
   };
 
   return (
-    <>
+    <ProtectedRoute requireLeadership>
       <Header title="Locais Físicos" onMenuToggle={() => {}}>
         <button className="btn btn-primary btn-sm" onClick={() => { resetForm(); setModalOpen(true); }}>
           ➕ Novo Local
@@ -155,6 +156,6 @@ export default function LocaisPage() {
           </form>
         </Modal>
       </div>
-    </>
+    </ProtectedRoute>
   );
 }

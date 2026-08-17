@@ -1620,6 +1620,11 @@ h4 { font-size: var(--font-size-lg); }
   background: var(--surface-hover);
 }
 
+.data-table tr:focus-within {
+  position: relative;
+  z-index: 1000;
+}
+
 /* ============================================================
    CONFIRM DIALOG
    ============================================================ */

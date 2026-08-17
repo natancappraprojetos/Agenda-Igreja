@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useToast } from '@/lib/hooks/useToast';
 import Link from 'next/link';
 import type { ChurchEvent, CalendarView } from '@/lib/types';
+import PersonSelect from '@/components/ui/PersonSelect';
 import {
   getMonthDays, getWeekDays, isToday, isSameDay,
   formatMonthYear, getWeekdayShort, getWeekdayName,
@@ -19,8 +21,82 @@ export default function AgendaPage() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<ChurchEvent | null>(null);
+  const [eventParticipants, setEventParticipants] = useState<any[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<any[]>([]);
+  const [addingExtraRole, setAddingExtraRole] = useState(false);
+  const [newExtraRoleId, setNewExtraRoleId] = useState('');
+  
   const supabase = createClient();
-  const { user, isLeadership } = useAuth();
+  const { user, isLeadership, roles } = useAuth();
+  const { addToast } = useToast();
+
+  const fetchExtraParticipants = useCallback(async (eventId: string) => {
+    const { data: epData } = await supabase
+      .from('event_participants')
+      .select('*, role:roles(*), person:people(*)')
+      .eq('event_id', eventId);
+    if (epData) setEventParticipants(epData);
+    
+    const { data: rolesData } = await supabase.from('roles').select('*').order('name');
+    if (rolesData) setAvailableRoles(rolesData);
+  }, [supabase]);
+
+  useEffect(() => {
+    if (selectedEvent) {
+      fetchExtraParticipants(selectedEvent.id);
+    }
+  }, [selectedEvent?.id, fetchExtraParticipants]);
+
+  const handleUpdateRole = async (eventId: string, field: string, personId: string | null) => {
+    try {
+      const { error } = await supabase.from('events').update({ [field]: personId }).eq('id', eventId);
+      if (error) throw error;
+      
+      const { data } = await supabase
+        .from('events')
+        .select(`
+          *,
+          event_type:event_types(*),
+          location:locations(*),
+          preacher:people!events_preacher_id_fkey(*),
+          worship_leader:people!events_worship_leader_id_fkey(*),
+          sound_person:people!events_sound_person_id_fkey(*),
+          responsible_person:people!events_responsible_person_id_fkey(*)
+        `)
+        .eq('id', eventId)
+        .single();
+        
+      if (data) {
+        setSelectedEvent(data as ChurchEvent);
+        setEvents(prev => prev.map(e => e.id === eventId ? (data as ChurchEvent) : e));
+        addToast({ type: 'success', title: 'Salvo com sucesso' });
+      }
+    } catch (err) {
+      console.error(err);
+      addToast({ type: 'error', title: 'Erro ao atualizar' });
+    }
+  };
+
+  const handleUpdateExtraRole = async (epId: string | undefined, eventId: string, roleId: string, personId: string | null) => {
+    try {
+      if (!personId && epId) {
+        // Delete
+        await supabase.from('event_participants').delete().eq('id', epId);
+      } else if (personId && !epId) {
+        // Insert
+        await supabase.from('event_participants').insert({ event_id: eventId, role_id: roleId, person_id: personId });
+      } else if (personId && epId) {
+        // Update
+        await supabase.from('event_participants').update({ person_id: personId }).eq('id', epId);
+      }
+      
+      await fetchExtraParticipants(eventId);
+      addToast({ type: 'success', title: 'Função atualizada com sucesso' });
+    } catch (err) {
+      console.error(err);
+      addToast({ type: 'error', title: 'Erro ao atualizar função' });
+    }
+  };
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
@@ -81,7 +157,16 @@ export default function AgendaPage() {
   const goToday = () => setCurrentDate(new Date());
 
   const getEventsForDate = (date: Date) =>
-    events.filter(e => isSameDay(parseDate(e.date), date));
+    events
+      .filter(e => isSameDay(parseDate(e.date), date))
+      .sort((a, b) => {
+        // Comissão sempre no topo, independente do horário
+        const aIsComissao = a.event_type?.name?.toLowerCase().includes('comissão');
+        const bIsComissao = b.event_type?.name?.toLowerCase().includes('comissão');
+        if (aIsComissao && !bIsComissao) return -1;
+        if (bIsComissao && !aIsComissao) return 1;
+        return (a.start_time || '').localeCompare(b.start_time || '');
+      });
 
   const getDateLabel = () => {
     if (view === 'month') return formatMonthYear(currentDate);
@@ -397,31 +482,165 @@ export default function AgendaPage() {
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border-light)', margin: 'var(--space-4) 0' }} />
 
                 <div className="review-grid">
-                  {selectedEvent.preacher && (
-                    <div className="review-section">
-                      <div className="review-label">🎤 Pregador</div>
-                      <div className="review-value">{selectedEvent.preacher.name}</div>
+                  <div className="review-section" style={{ overflow: 'visible' }}>
+                    <div className="review-label">🔊 Sonoplastia</div>
+                    <div className="review-value">
+                      {(isLeadership || roles?.includes('sonoplastia')) ? (
+                        <PersonSelect 
+                          value={selectedEvent.sound_person_id || ''} 
+                          onChange={(val) => handleUpdateRole(selectedEvent.id, 'sound_person_id', val)} 
+                          placeholder="Definir..." 
+                        />
+                      ) : (
+                        selectedEvent.sound_person?.name || <span style={{ color: 'var(--text-tertiary)' }}>Não definido</span>
+                      )}
                     </div>
-                  )}
-                  {selectedEvent.worship_leader && (
-                    <div className="review-section">
-                      <div className="review-label">🎵 Louvor</div>
-                      <div className="review-value">{selectedEvent.worship_leader.name}</div>
+                  </div>
+
+                  <div className="review-section" style={{ overflow: 'visible' }}>
+                    <div className="review-label">🎤 Pregador</div>
+                    <div className="review-value">
+                      {(isLeadership) ? (
+                        <PersonSelect 
+                          value={selectedEvent.preacher_id || ''} 
+                          onChange={(val) => handleUpdateRole(selectedEvent.id, 'preacher_id', val)} 
+                          placeholder="Definir..." 
+                        />
+                      ) : (
+                        selectedEvent.preacher?.name || <span style={{ color: 'var(--text-tertiary)' }}>Não definido</span>
+                      )}
                     </div>
-                  )}
-                  {selectedEvent.sound_person && (
-                    <div className="review-section">
-                      <div className="review-label">🔊 Sonoplastia</div>
-                      <div className="review-value">{selectedEvent.sound_person.name}</div>
+                  </div>
+
+                  <div className="review-section" style={{ overflow: 'visible' }}>
+                    <div className="review-label">🎵 Louvor</div>
+                    <div className="review-value">
+                      {(isLeadership || roles?.includes('musica')) ? (
+                        <PersonSelect 
+                          value={selectedEvent.worship_leader_id || ''} 
+                          onChange={(val) => handleUpdateRole(selectedEvent.id, 'worship_leader_id', val)} 
+                          placeholder="Definir..." 
+                        />
+                      ) : (
+                        selectedEvent.worship_leader?.name || <span style={{ color: 'var(--text-tertiary)' }}>Não definido</span>
+                      )}
                     </div>
-                  )}
-                  {selectedEvent.responsible_person && (
-                    <div className="review-section">
-                      <div className="review-label">👤 Responsável</div>
-                      <div className="review-value">{selectedEvent.responsible_person.name}</div>
+                  </div>
+
+
+
+                  <div className="review-section" style={{ overflow: 'visible' }}>
+                    <div className="review-label">👤 Responsável</div>
+                    <div className="review-value">
+                      {(isLeadership || roles?.includes('diacono') || roles?.includes('admin')) ? (
+                        <PersonSelect 
+                          value={selectedEvent.responsible_person_id || ''} 
+                          onChange={(val) => handleUpdateRole(selectedEvent.id, 'responsible_person_id', val)} 
+                          placeholder="Definir..." 
+                        />
+                      ) : (
+                        selectedEvent.responsible_person?.name || <span style={{ color: 'var(--text-tertiary)' }}>Não definido</span>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
+
+                {/* FUNÇÕES EXTRAS (LITURGIA/ESCALAS) */}
+                {(() => {
+                  if (!user) return null;
+                  
+                  const isSabado = selectedEvent.title.toLowerCase().includes('sáb') || selectedEvent.title.toLowerCase().includes('sabado');
+                  const baseVirtualRoles = isSabado ? ['Escola Sabatina', 'História das Crianças', 'Ofertas', 'Anúncios'] : [];
+                  
+                  const displayedRoles: any[] = [];
+                  const standardRoles = ['Pregador', 'Pregador(a)', 'Ancião', 'Diácono', 'Diaconisa', 'Diácono/Diaconisa', 'Sonoplasta', 'Cantor', 'Líder de Louvor', 'Instrumentista', 'Pianista', 'Violonista', 'Cantor(a) Solo', 'Cantor(a) Congregacional', 'Responsável', 'Diretor'];
+
+                  baseVirtualRoles.forEach(vr => {
+                     const ep = eventParticipants.find(p => p.role?.name === vr);
+                     if (ep) {
+                         displayedRoles.push({ roleName: vr, roleId: ep.role_id, personId: ep.person_id, personName: ep.person?.name, epId: ep.id });
+                     } else {
+                         const roleObj = availableRoles.find(r => r.name === vr);
+                         displayedRoles.push({ roleName: vr, roleId: roleObj?.id });
+                     }
+                  });
+
+                  eventParticipants.forEach(ep => {
+                     if (!standardRoles.includes(ep.role?.name) && !baseVirtualRoles.includes(ep.role?.name)) {
+                         displayedRoles.push({ roleName: ep.role?.name, roleId: ep.role_id, personId: ep.person_id, personName: ep.person?.name, epId: ep.id });
+                     }
+                  });
+
+                  return (
+                    <>
+                      {displayedRoles.length > 0 && (
+                        <div className="review-grid" style={{ marginTop: 'var(--space-2)' }}>
+                          {displayedRoles.map((dr, idx) => (
+                            <div key={idx} className="review-section" style={{ overflow: 'visible' }}>
+                              <div className="review-label">✨ {dr.roleName}</div>
+                              <div className="review-value">
+                                {dr.roleId ? (
+                                  <PersonSelect 
+                                    value={dr.personId || ''} 
+                                    onChange={(val) => handleUpdateExtraRole(dr.epId, selectedEvent.id, dr.roleId, val)} 
+                                    placeholder="Definir..." 
+                                  />
+                                ) : (
+                                  <span style={{ color: 'var(--text-danger)' }}>Erro: Função não cadastrada</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {(isLeadership) && (
+                        <div style={{ marginTop: 'var(--space-4)' }}>
+                          {!addingExtraRole ? (
+                            <button className="btn btn-ghost btn-sm" onClick={() => setAddingExtraRole(true)} style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                              + Adicionar Função Extra
+                            </button>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', padding: 'var(--space-3)', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)' }}>
+                              <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Nova Função Extra</div>
+                              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                                <select 
+                                  className="form-input" 
+                                  value={newExtraRoleId}
+                                  onChange={(e) => setNewExtraRoleId(e.target.value)}
+                                  style={{ flex: 1 }}
+                                >
+                                  <option value="">Selecione a função...</option>
+                                  {availableRoles.filter(r => !standardRoles.includes(r.name) && !displayedRoles.find(dr => dr.roleId === r.id)).map(r => (
+                                    <option key={r.id} value={r.id}>{r.name}</option>
+                                  ))}
+                                </select>
+                                
+                                {newExtraRoleId && (
+                                  <div style={{ flex: 1 }}>
+                                    <PersonSelect 
+                                      value=""
+                                      onChange={(val) => {
+                                         if (val) {
+                                            handleUpdateExtraRole(undefined, selectedEvent.id, newExtraRoleId, val);
+                                            setAddingExtraRole(false);
+                                            setNewExtraRoleId('');
+                                         }
+                                      }}
+                                      placeholder="Escolher pessoa..."
+                                    />
+                                  </div>
+                                )}
+                                
+                                <button className="btn btn-ghost btn-sm" onClick={() => { setAddingExtraRole(false); setNewExtraRoleId(''); }}>Cancelar</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {selectedEvent.description && (
                   <div className="review-section mt-4">
