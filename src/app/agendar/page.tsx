@@ -431,7 +431,7 @@ export default function PublicAgendarWizard() {
                   <label className="form-label">📅 Data</label>
                   <input type="date" className="form-input" value={date} onChange={e => setDate(e.target.value)} />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', alignItems: 'end' }}>
                   <div className="form-group">
                     <label className="form-label">Horário de Início *</label>
                     <input type="time" className="form-input" value={startTime} onChange={e => setStartTime(e.target.value)} required />
