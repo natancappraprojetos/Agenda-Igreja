@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/lib/hooks/useToast';
 import Header from '@/components/layout/Header';
 import SearchSelect from '@/components/ui/SearchSelect';
-import { generateLiturgyTemplate } from '@/lib/liturgyTemplate';
 import PersonSelect from '@/components/ui/PersonSelect';
 import PersonAutocomplete from '@/components/ui/PersonAutocomplete';
 import type { EventType, Location, Ministry, Person } from '@/lib/types';
