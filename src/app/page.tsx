@@ -485,45 +485,33 @@ export default function AgendaPage() {
                   <div className="review-section" style={{ overflow: 'visible' }}>
                     <div className="review-label">🔊 Sonoplastia</div>
                     <div className="review-value">
-                      {(isLeadership || roles?.includes('sonoplastia')) ? (
                         <PersonSelect 
                           value={selectedEvent.sound_person_id || ''} 
                           onChange={(val) => handleUpdateRole(selectedEvent.id, 'sound_person_id', val)} 
                           placeholder="Definir..." 
                         />
-                      ) : (
-                        selectedEvent.sound_person?.name || <span style={{ color: 'var(--text-tertiary)' }}>Não definido</span>
-                      )}
                     </div>
                   </div>
 
                   <div className="review-section" style={{ overflow: 'visible' }}>
                     <div className="review-label">🎤 Pregador</div>
                     <div className="review-value">
-                      {(isLeadership) ? (
                         <PersonSelect 
                           value={selectedEvent.preacher_id || ''} 
                           onChange={(val) => handleUpdateRole(selectedEvent.id, 'preacher_id', val)} 
                           placeholder="Definir..." 
                         />
-                      ) : (
-                        selectedEvent.preacher?.name || <span style={{ color: 'var(--text-tertiary)' }}>Não definido</span>
-                      )}
                     </div>
                   </div>
 
                   <div className="review-section" style={{ overflow: 'visible' }}>
                     <div className="review-label">🎵 Louvor</div>
                     <div className="review-value">
-                      {(isLeadership || roles?.includes('musica')) ? (
                         <PersonSelect 
                           value={selectedEvent.worship_leader_id || ''} 
                           onChange={(val) => handleUpdateRole(selectedEvent.id, 'worship_leader_id', val)} 
                           placeholder="Definir..." 
                         />
-                      ) : (
-                        selectedEvent.worship_leader?.name || <span style={{ color: 'var(--text-tertiary)' }}>Não definido</span>
-                      )}
                     </div>
                   </div>
 
@@ -532,15 +520,11 @@ export default function AgendaPage() {
                   <div className="review-section" style={{ overflow: 'visible' }}>
                     <div className="review-label">👤 Responsável</div>
                     <div className="review-value">
-                      {(isLeadership || roles?.includes('diacono') || roles?.includes('admin')) ? (
                         <PersonSelect 
                           value={selectedEvent.responsible_person_id || ''} 
                           onChange={(val) => handleUpdateRole(selectedEvent.id, 'responsible_person_id', val)} 
                           placeholder="Definir..." 
                         />
-                      ) : (
-                        selectedEvent.responsible_person?.name || <span style={{ color: 'var(--text-tertiary)' }}>Não definido</span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -594,7 +578,7 @@ export default function AgendaPage() {
                         </div>
                       )}
 
-                      {(isLeadership) && (
+                      {(true) && (
                         <div style={{ marginTop: 'var(--space-4)' }}>
                           {!addingExtraRole ? (
                             <button className="btn btn-ghost btn-sm" onClick={() => setAddingExtraRole(true)} style={{ color: 'var(--primary)', fontWeight: 600 }}>

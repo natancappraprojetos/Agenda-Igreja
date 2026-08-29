@@ -35,8 +35,8 @@ export async function updateSession(request: NextRequest) {
   const user = session?.user;
 
   // Public routes that don't require auth
-  const publicPaths = ['/login', '/compartilhar', '/evento', '/agendar', '/api/webhooks'];
-  const isPublicPath = request.nextUrl.pathname === '/' || publicPaths.some(path => request.nextUrl.pathname.startsWith(path));
+  // Todas as rotas base são públicas, apenas admin é protegido
+  const isPublicPath = !request.nextUrl.pathname.startsWith('/admin');
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();

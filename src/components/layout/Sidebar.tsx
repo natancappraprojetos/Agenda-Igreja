@@ -77,20 +77,27 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         <nav className="sidebar-nav">
-          {/* Agenda Geral is visible to everyone with at least strict leader access */}
-          {(isAdmin || isLeadership || isStrictLeader) && (
-            <Link
-              href="/"
-              className={`sidebar-link ${isActive('/') ? 'active' : ''}`}
-              onClick={onClose}
-            >
-              <span className="sidebar-link-icon"><CalendarDays size={20} /></span>
-              Agenda Geral
-            </Link>
-          )}
+          {/* Agenda Geral e Novo Evento são visíveis para todos */}
+          <Link
+            href="/"
+            className={`sidebar-link ${isActive('/') ? 'active' : ''}`}
+            onClick={onClose}
+          >
+            <span className="sidebar-link-icon"><CalendarDays size={20} /></span>
+            Agenda Geral
+          </Link>
 
-          {/* Outros itens do navItems - Only for Admin and Liderança */}
-          {(isAdmin || isLeadership) && navItems.filter(item => item.href !== '/').map(item => (
+          <Link
+            href="/eventos/novo"
+            className={`sidebar-link ${isActive('/eventos/novo') ? 'active' : ''}`}
+            onClick={onClose}
+          >
+            <span className="sidebar-link-icon"><PlusCircle size={20} /></span>
+            Novo Evento
+          </Link>
+
+          {/* Pendências e Visão Geral apenas para Admin e Liderança */}
+          {(isAdmin || isLeadership) && navItems.filter(item => item.href !== '/' && item.href !== '/eventos/novo').map(item => (
             <Link
               key={item.href}
               href={item.href}
@@ -102,7 +109,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             </Link>
           ))}
 
-          {(isAdmin || isLeadership || hasTeam) && (
+          {/* Escalas é público, então a seção Cadastros sempre renderiza (mas os itens são filtrados) */}
+          {(true) && (
             <>
               <div className="sidebar-section">
                 <div className="sidebar-section-title">Cadastros</div>
@@ -122,9 +130,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                   return null;
                 }
 
-                // Strict Leaders só veem Minha Equipe e Escalas dentro de Cadastros
-                if (isStrictLeader && !isAdmin && !isLeadership) {
-                  if (item.href !== '/escalas') return null;
+                // Escalas agora é público
+                if (!isAdmin && !isLeadership && item.href !== '/escalas') {
+                  return null;
                 }
                 
                 return (

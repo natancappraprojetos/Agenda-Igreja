@@ -817,10 +817,8 @@ function NovoEventoWizard() {
 
 export default function NovoEventoPage() {
   return (
-    <ProtectedRoute requireLeadership>
-      <Suspense fallback={<div className="loading-page"><div className="spinner spinner-lg" /></div>}>
-        <NovoEventoWizard />
-      </Suspense>
-    </ProtectedRoute>
+    <Suspense fallback={<div className="loading-page"><div className="spinner spinner-lg" /></div>}>
+      <NovoEventoWizard />
+    </Suspense>
   );
 }
