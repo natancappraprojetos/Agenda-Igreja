@@ -32,9 +32,12 @@ export default function EquipePage() {
     if (roles.includes('sonoplastia')) rolesToManage.push('Sonoplasta');
     if (roles.includes('diacono')) rolesToManage.push('Diácono', 'Diaconisa', 'Diácono/Diaconisa');
     if (roles.includes('musica')) rolesToManage.push('Cantor(a) Solo', 'Cantor(a) Congregacional', 'Instrumentista', 'Líder de Louvor', 'Cantor', 'Pianista', 'Violonista');
-    if (roles.includes('anciao')) rolesToManage.push('Pregador', 'Pregador(a)', 'Ancião', 'Sonoplasta', 'Líder de Louvor', 'Diretor');
+    if (roles.includes('anciao')) rolesToManage.push('Pregador', 'Pregador(a)', 'Ancião');
     return rolesToManage;
   }, [roles]);
+
+  const isStrictLeader = roles.some(r => ['musica', 'sonoplastia', 'diacono'].includes(r));
+  const pageTitle = (!isStrictLeader && roles.includes('anciao')) ? 'Lista de Pregadores' : 'Minha Equipe';
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -152,11 +155,24 @@ export default function EquipePage() {
     }
   };
 
+  const handleRemoveMultiple = async (ids: string[], personName: string) => {
+    if (!confirm(`Deseja realmente remover ${personName} de todas as funções desta categoria?`)) return;
+    try {
+      for (const id of ids) {
+        await supabase.from('person_roles').delete().eq('id', id);
+      }
+      addToast({ type: 'success', title: 'Membro removido da equipe' });
+      fetchData();
+    } catch (err) {
+      addToast({ type: 'error', title: 'Erro ao remover' });
+    }
+  };
+
   const roleNames = getRolesToManage();
 
   return (
     <>
-      <Header title="Minha Equipe" onMenuToggle={() => {}}>
+      <Header title={pageTitle} onMenuToggle={() => {}}>
         {roleNames.length > 0 && (
           <button className="btn btn-primary btn-sm" onClick={() => setModalOpen(true)}>
             ➕ Adicionar Membro
@@ -181,43 +197,81 @@ export default function EquipePage() {
             <button className="btn btn-primary" onClick={() => setModalOpen(true)}>➕ Adicionar Membro</button>
           </div>
         ) : (
-          <div className="card" style={{ padding: 0 }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Pessoa</th>
-                  <th>Função</th>
-                  <th style={{ width: '80px', textAlign: 'center' }}>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {teamMembers.map(member => (
-                  <tr key={member.id}>
-                    <td style={{ fontWeight: 500 }}>
-                      {member.person?.name}
-                      {member.person?.whatsapp && (
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 400 }}>
-                          {member.person.whatsapp}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--space-4)' }}>
+            {(() => {
+              // Categorias de agrupamento
+              const categories: Record<string, string[]> = {
+                'Responsáveis de Louvor': ['Líder de Louvor'],
+                'Cantores Congregacionais': ['Cantor(a) Congregacional'],
+                'Músicos e Instrumentistas': ['Instrumentista', 'Pianista', 'Violonista', 'Cantor(a) Solo', 'Cantor'],
+                'Liderança Geral e Apoio': ['Sonoplasta', 'Ancião', 'Diretor'],
+                'Pregadores': ['Pregador', 'Pregador(a)'],
+                'Diaconato': ['Diácono', 'Diaconisa', 'Diácono/Diaconisa']
+              };
+
+              // Map each member to a category
+              const groupedMembers: Record<string, typeof teamMembers> = {};
+              
+              teamMembers.forEach(member => {
+                let assignedCat = 'Outros';
+                for (const [catName, roleList] of Object.entries(categories)) {
+                  if (roleList.includes(member.role?.name)) {
+                    assignedCat = catName;
+                    break;
+                  }
+                }
+                if (!groupedMembers[assignedCat]) groupedMembers[assignedCat] = [];
+                groupedMembers[assignedCat].push(member);
+              });
+
+              return Object.entries(groupedMembers).map(([catName, members]) => {
+                // Group by person ID within this category
+                const peopleMap: Record<string, { person: any, roles: any[], roleIds: string[] }> = {};
+                members.forEach(m => {
+                  const pid = m.person?.id;
+                  if (!pid) return;
+                  if (!peopleMap[pid]) {
+                    peopleMap[pid] = { person: m.person, roles: [m.role], roleIds: [m.id] };
+                  } else {
+                    peopleMap[pid].roles.push(m.role);
+                    peopleMap[pid].roleIds.push(m.id);
+                  }
+                });
+
+                return (
+                  <div key={catName} className="card" style={{ padding: '0' }}>
+                    <div style={{ padding: 'var(--space-3) var(--space-4)', backgroundColor: 'var(--background-secondary)', borderBottom: '1px solid var(--border-color)', fontWeight: 600 }}>
+                      {catName}
+                    </div>
+                    <div style={{ padding: 'var(--space-2)' }}>
+                      {Object.values(peopleMap).map(({ person, roles, roleIds }) => (
+                        <div key={person.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) var(--space-2)', borderBottom: '1px solid var(--border-color)' }}>
+                          <div>
+                            <div style={{ fontWeight: 500, fontSize: '0.95rem' }}>{person.name}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '2px', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+                              {roles.map((r, idx) => (
+                                <span key={r.id} className="badge badge-info" style={{ padding: '2px 6px', fontSize: '0.7rem' }}>
+                                  {r.name}
+                                </span>
+                              ))}
+                              {person.whatsapp && <span style={{ marginLeft: '4px' }}>{person.whatsapp}</span>}
+                            </div>
+                          </div>
+                          <button 
+                            className="btn-icon" 
+                            style={{ color: 'var(--danger)' }} 
+                            onClick={() => handleRemoveMultiple(roleIds, person.name)}
+                            title="Remover da equipe"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
-                      )}
-                    </td>
-                    <td>
-                      <span className="badge badge-info">{member.role?.name}</span>
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <button 
-                        className="btn btn-ghost btn-sm" 
-                        style={{ color: 'var(--danger)' }} 
-                        onClick={() => handleRemoveMember(member.id, member.person?.name)}
-                        title="Remover da equipe"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      ))}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
         )}
 

@@ -5,7 +5,10 @@ import { createClient } from '@/lib/supabase/client';
 import { ChurchEvent, Role, EventParticipant } from '@/lib/types';
 import { useToast } from '@/lib/hooks/useToast';
 import PersonSelect from './PersonSelect';
-import { Calendar, User as UserIcon, CheckCircle2 } from 'lucide-react';
+import Modal from './Modal';
+import MiniCalendar from './MiniCalendar';
+import { Calendar, User as UserIcon, CheckCircle2, Trash2 } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface EscalasGridProps {
   title: string;
@@ -22,6 +25,13 @@ export default function EscalasGrid({ title, icon, eventTypesToInclude, rolesToM
   const [events, setEvents] = useState<ChurchEvent[]>([]);
   const [participants, setParticipants] = useState<Record<string, EventParticipant[]>>({});
   const [roleMap, setRoleMap] = useState<Record<string, string>>({}); // name -> id
+  const [eventTypes, setEventTypes] = useState<any[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [newDraft, setNewDraft] = useState<{date: Date | null, time: string, typeId: string}>({ 
+    date: null, 
+    time: '09:00', 
+    typeId: '' 
+  });
 
   useEffect(() => {
     fetchData();
@@ -44,6 +54,7 @@ export default function EscalasGrid({ title, icon, eventTypesToInclude, rolesToM
       let eventsQuery = supabase
         .from('events')
         .select('*, event_type:event_types(name)')
+        .in('status', ['scheduled', 'draft'])
         .gte('date', new Date().toISOString().split('T')[0])
         .order('date', { ascending: true })
         .limit(20);
@@ -78,11 +89,72 @@ export default function EscalasGrid({ title, icon, eventTypesToInclude, rolesToM
         });
         setParticipants(pMap);
       }
+      
+      // Fetch event types for the modal
+      const { data: typesData } = await supabase.from('event_types').select('*').order('name');
+      if (typesData) setEventTypes(typesData);
+
     } catch (err) {
       console.error(err);
       addToast({ type: 'error', title: 'Erro ao carregar escala' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateDraft = async () => {
+    if (!newDraft.date || !newDraft.time || !newDraft.typeId) {
+      addToast({ type: 'error', title: 'Preencha todos os campos' });
+      return;
+    }
+    setLoading(true);
+    try {
+      // Format using date-fns to avoid timezone issues (toISOString() shifts to UTC)
+      const dateStr = format(newDraft.date, 'yyyy-MM-dd');
+      
+      // Prevent duplicates
+      const { data: existing } = await supabase
+        .from('events')
+        .select('id')
+        .eq('date', dateStr)
+        .eq('start_time', newDraft.time)
+        .eq('event_type_id', newDraft.typeId)
+        .maybeSingle();
+        
+      if (existing) {
+        addToast({ type: 'error', title: 'Já existe um espaço ou culto para esta data e horário!' });
+        setLoading(false);
+        return;
+      }
+      
+      const { error } = await supabase.from('events').insert({
+        title: 'Culto (Rascunho)',
+        date: dateStr,
+        start_time: newDraft.time,
+        event_type_id: newDraft.typeId,
+        status: 'draft',
+      });
+      if (error) throw error;
+      addToast({ type: 'success', title: 'Espaço de escala criado!' });
+      setShowModal(false);
+      setNewDraft({ date: null, time: '09:00', typeId: '' });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      addToast({ type: 'error', title: 'Erro ao criar espaço' });
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteDraft = async (id: string) => {
+    if (!confirm('Deseja realmente excluir este espaço de escala? (Qualquer pessoa escalada nele será removida)')) return;
+    try {
+      const { error } = await supabase.from('events').delete().eq('id', id);
+      if (error) throw error;
+      addToast({ type: 'success', title: 'Espaço excluído' });
+      fetchData();
+    } catch (err) {
+      addToast({ type: 'error', title: 'Erro ao excluir' });
     }
   };
 
@@ -120,14 +192,48 @@ export default function EscalasGrid({ title, icon, eventTypesToInclude, rolesToM
     }
   };
 
+  const handleAddParticipant = async (eventId: string, roleId: string, personId: string) => {
+    try {
+      // Check if already in list for this event+role
+      const existing = participants[eventId]?.find(p => p.role_id === roleId && p.person_id === personId);
+      if (existing) return;
+      
+      await supabase.from('event_participants').insert({
+        event_id: eventId,
+        role_id: roleId,
+        person_id: personId
+      });
+      addToast({ type: 'success', title: 'Pessoa adicionada com sucesso!' });
+      fetchData();
+    } catch (err) {
+      addToast({ type: 'error', title: 'Erro ao adicionar' });
+    }
+  };
+
+  const handleRemoveParticipant = async (participantId: string) => {
+    try {
+      await supabase.from('event_participants').delete().eq('id', participantId);
+      addToast({ type: 'success', title: 'Pessoa removida' });
+      fetchData();
+    } catch (err) {
+      addToast({ type: 'error', title: 'Erro ao remover' });
+    }
+  };
+
   if (loading) return <div style={{ padding: 'var(--space-4)', textAlign: 'center' }}>Carregando escalas...</div>;
 
   return (
-    <div className="card" style={{ padding: 0, marginBottom: 'var(--space-6)' }}>
-      <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-        {icon}
-        <h2 style={{ margin: 0, fontSize: '1.1rem' }}>{title}</h2>
-      </div>
+    <>
+      <div className="card" style={{ padding: 0, marginBottom: 'var(--space-6)' }}>
+        <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            {icon}
+            <h2 style={{ margin: 0, fontSize: '1.1rem' }}>{title}</h2>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>
+            + Criar Espaço de Escala
+          </button>
+        </div>
       
       <div style={{ overflowX: 'auto', paddingBottom: '150px' }}>
         <table className="data-table" style={{ width: '100%', minWidth: '600px' }}>
@@ -159,10 +265,10 @@ export default function EscalasGrid({ title, icon, eventTypesToInclude, rolesToM
                           minWidth: '50px'
                         }}>
                           <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary)', textTransform: 'uppercase' }}>
-                            {new Date(event.date).toLocaleDateString('pt-BR', { weekday: 'short' })}
+                            {new Date(event.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short' })}
                           </div>
                           <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>
-                            {new Date(event.date).getDate()}
+                            {new Date(event.date + 'T12:00:00').getDate()}
                           </div>
                         </div>
                         <div>
@@ -170,13 +276,51 @@ export default function EscalasGrid({ title, icon, eventTypesToInclude, rolesToM
                           <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                             {event.start_time.substring(0, 5)}
                           </div>
+                          {event.status === 'draft' && (
+                            <button 
+                              className="btn btn-ghost btn-sm" 
+                              style={{ padding: '0', height: 'auto', color: 'var(--danger)', marginTop: '8px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              onClick={() => handleDeleteDraft(event.id)}
+                            >
+                              <Trash2 size={12} /> Excluir Rascunho
+                            </button>
+                          )}
                         </div>
                       </div>
                     </td>
                     
                     {rolesToManage.map(roleName => {
                       const roleId = roleMap[roleName];
-                      const currentAssignee = eventParts.find(p => p.role_id === roleId);
+                      const isMultiple = roleName.toLowerCase().includes('congregacional') || roleName.toLowerCase().includes('grupo');
+                      const roleAssignees = eventParts.filter(p => p.role_id === roleId);
+                      const currentAssignee = roleAssignees.length > 0 ? roleAssignees[0] : null;
+                      
+                      if (isMultiple) {
+                        return (
+                          <td key={roleName} style={{ minWidth: '250px', verticalAlign: 'top', paddingTop: 'var(--space-2)' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                              {roleAssignees.map(assignee => (
+                                <div key={assignee.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--background-secondary)', padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)' }}>
+                                  <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{assignee.person?.name}</span>
+                                  <button 
+                                    className="btn-icon" 
+                                    onClick={() => handleRemoveParticipant(assignee.id)}
+                                    style={{ padding: '2px', color: 'var(--text-danger)' }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                              <PersonSelect 
+                                value=""
+                                onChange={(personId) => personId && handleAddParticipant(event.id, roleId, personId)}
+                                placeholder="Adicionar..."
+                                roleId={roleId}
+                              />
+                            </div>
+                          </td>
+                        );
+                      }
                       
                       return (
                         <td key={roleName} style={{ minWidth: '250px', verticalAlign: 'middle' }}>
@@ -197,5 +341,50 @@ export default function EscalasGrid({ title, icon, eventTypesToInclude, rolesToM
         </table>
       </div>
     </div>
+
+    <Modal 
+      isOpen={showModal} 
+      onClose={() => setShowModal(false)}
+      title="Criar Espaço para Escala"
+      size="lg"
+      footer={
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
+          <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancelar</button>
+          <button className="btn btn-primary" onClick={handleCreateDraft}>Criar Espaço</button>
+        </div>
+      }
+    >
+      <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', fontSize: '0.9rem' }}>
+        Crie um espaço de evento antecipado para poder escalar sua equipe. Este rascunho não aparecerá na agenda geral até que o culto seja oficialmente criado.
+      </p>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
+        <div>
+          <h4 style={{ marginBottom: 'var(--space-2)' }}>1. Selecione a Data</h4>
+          <MiniCalendar 
+            selectedDate={newDraft.date} 
+            onSelectDate={d => setNewDraft({...newDraft, date: d})} 
+          />
+        </div>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div className="form-group">
+            <label>2. Horário do Evento</label>
+            <input type="time" className="input" value={newDraft.time} onChange={e => setNewDraft({...newDraft, time: e.target.value})} />
+          </div>
+          
+          <div className="form-group">
+            <label>3. Tipo de Evento</label>
+            <select className="input" value={newDraft.typeId} onChange={e => setNewDraft({...newDraft, typeId: e.target.value})}>
+              <option value="">Selecione...</option>
+              {eventTypes.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+    </Modal>
+    </>
   );
 }

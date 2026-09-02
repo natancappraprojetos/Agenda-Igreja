@@ -60,14 +60,17 @@ export default function NotificacoesPage() {
             missingRoles.push('Diaconato');
           }
           if (roles.includes('musica') && event.has_worship_leader === false) {
-            missingRoles.push('Louvor/Música');
+            if (event.event_type && event.event_type.toLowerCase().includes('culto')) {
+              missingRoles.push('Louvor/Música');
+            }
           }
           if (roles.includes('anciao') && event.has_preacher === false) {
             missingRoles.push('Pregador(a)');
           }
 
           if (missingRoles.length > 0) {
-            const eventDateStr = new Date(event.date).toLocaleDateString('pt-BR');
+            const [year, month, day] = event.date.split('-');
+            const eventDateStr = `${day}/${month}/${year}`;
             allNotifications.push({
               id: `pendency-${event.event_id}-${missingRoles.join('-')}`,
               type: 'pending_scale',
@@ -75,7 +78,7 @@ export default function NotificacoesPage() {
               message: `O evento do dia ${eventDateStr} (${event.start_time.substring(0,5)}) precisa de pessoas para: ${missingRoles.join(', ')}. Acesse "Escalas" para definir.`,
               event_id: event.event_id,
               is_read: false, // Pendências dinâmicas sempre aparecem como não lidas até serem resolvidas
-              created_at: new Date(event.date).toISOString() // Usa a data do evento para ordenação
+              created_at: `${event.date}T12:00:00Z` // Usa a data do evento para ordenação
             });
           }
         });

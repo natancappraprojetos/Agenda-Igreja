@@ -12,6 +12,7 @@ import type { EventType, Location, Ministry, Person } from '@/lib/types';
 
 import { Suspense } from 'react';
 import ProtectedRoute from '@/components/ui/ProtectedRoute';
+import { createPersonAdmin } from '@/app/actions';
 
 const TOTAL_STEPS = 8;
 
@@ -58,6 +59,13 @@ function NovoEventoWizard() {
   const [historiaName, setHistoriaName] = useState('');
   const [notes, setNotes] = useState('');
   const [description, setDescription] = useState('');
+
+  const [draftRoles, setDraftRoles] = useState({
+    preacher: false,
+    worship: false,
+    ofertas: false,
+    historia: false
+  });
 
   const [parentEventId, setParentEventId] = useState('');
   const [existingCultos, setExistingCultos] = useState<Array<any>>([]);
@@ -106,6 +114,93 @@ function NovoEventoWizard() {
   }, [locationId, date, startTime, endTime, supabase]);
 
   useEffect(() => { checkLocationConflict(); }, [checkLocationConflict]);
+
+  // Fetch draft event to pre-fill scales
+  const checkDraftEvent = useCallback(async () => {
+    if (!date || !startTime) return;
+    
+    const { data: draftEvent } = await supabase
+      .from('events')
+      .select('id, preacher_id, worship_leader_id, sound_person_id, preacher:people!events_preacher_id_fkey(id, name), worship:people!events_worship_leader_id_fkey(id, name)')
+      .eq('date', date)
+      .eq('start_time', startTime)
+      .eq('status', 'draft')
+      .maybeSingle();
+
+    if (draftEvent) {
+      const newDraftRoles = { preacher: false, worship: false, ofertas: false, historia: false };
+      
+      const { data: parts } = await supabase
+         .from('event_participants')
+         .select('*, role:roles(name), person:people(name)')
+         .eq('event_id', draftEvent.id);
+      
+      if (parts) {
+         // Check Preacher in participants first
+         const pregadorPart = parts.find(p => p.role?.name?.includes('Pregador'));
+         if (pregadorPart) {
+            setPreacherOption('igreja');
+            setPreacherId(pregadorPart.person_id);
+            setPreacherName(pregadorPart.person?.name || '');
+            newDraftRoles.preacher = true;
+         } else if (draftEvent.preacher_id) {
+            setPreacherOption('igreja');
+            setPreacherId(draftEvent.preacher_id);
+            setPreacherName(draftEvent.preacher?.name || '');
+            newDraftRoles.preacher = true;
+         }
+
+         // Check Worship Leader in participants first
+         const louvorPart = parts.find(p => p.role?.name?.includes('Líder de Louvor') || p.role?.name?.includes('Música'));
+         if (louvorPart) {
+            setWorshipOption('igreja');
+            setWorshipLeaderId(louvorPart.person_id);
+            setWorshipLeaderName(louvorPart.person?.name || '');
+            newDraftRoles.worship = true;
+         } else if (draftEvent.worship_leader_id) {
+            setWorshipOption('igreja');
+            setWorshipLeaderId(draftEvent.worship_leader_id);
+            setWorshipLeaderName(draftEvent.worship?.name || '');
+            newDraftRoles.worship = true;
+         }
+         
+         const ofertas = parts.find(p => p.role?.name === 'Ofertas' || p.role?.name === 'Diácono' || p.role?.name === 'Diácono/Diaconisa');
+         if (ofertas) {
+            setOfertasOption('igreja');
+            setOfertasId(ofertas.person_id);
+            setOfertasName(ofertas.person?.name || '');
+            newDraftRoles.ofertas = true;
+         }
+         
+         const historia = parts.find(p => p.role?.name === 'História das Crianças');
+         if (historia) {
+            setHistoriaOption('igreja');
+            setHistoriaId(historia.person_id);
+            setHistoriaName(historia.person?.name || '');
+            newDraftRoles.historia = true;
+         }
+      } else {
+         // Fallback if no parts but has event columns
+         if (draftEvent.preacher_id) {
+            setPreacherOption('igreja');
+            setPreacherId(draftEvent.preacher_id);
+            setPreacherName(draftEvent.preacher?.name || '');
+            newDraftRoles.preacher = true;
+         }
+         if (draftEvent.worship_leader_id) {
+            setWorshipOption('igreja');
+            setWorshipLeaderId(draftEvent.worship_leader_id);
+            setWorshipLeaderName(draftEvent.worship?.name || '');
+            newDraftRoles.worship = true;
+         }
+      }
+      setDraftRoles(newDraftRoles);
+    } else {
+      setDraftRoles({ preacher: false, worship: false, ofertas: false, historia: false });
+    }
+  }, [date, startTime, supabase]);
+
+  useEffect(() => { checkDraftEvent(); }, [checkDraftEvent]);
 
   const isCulto = !!eventTypes.find(t => t.id === eventTypeId)?.name.toLowerCase().match(/culto|jovem|desbravador|batismo|especial|sabatina/);
 
@@ -214,6 +309,42 @@ function NovoEventoWizard() {
          }
       }
 
+      let finalPreacherId = preacherId;
+      console.log('DEBUG preacher:', { preacherOption, preacherName, preacherId });
+      if (preacherOption === 'igreja' && preacherName && !preacherId) {
+        try {
+          console.log('Calling createPersonAdmin for:', preacherName.trim());
+          const data = await createPersonAdmin(preacherName.trim(), true);
+          console.log('createPersonAdmin result:', data);
+          if (data) finalPreacherId = data.id;
+        } catch (err) { console.error('Error in createPersonAdmin:', err); }
+      }
+      console.log('finalPreacherId:', finalPreacherId);
+      
+      let finalWorshipLeaderId = worshipLeaderId;
+      if (worshipOption === 'igreja' && worshipLeaderName && !worshipLeaderId) {
+        try {
+          const data = await createPersonAdmin(worshipLeaderName.trim(), true);
+          if (data) finalWorshipLeaderId = data.id;
+        } catch (err) { console.error(err); }
+      }
+      
+      let finalOfertasId = ofertasId;
+      if (ofertasOption === 'igreja' && ofertasName && !ofertasId) {
+        try {
+          const data = await createPersonAdmin(ofertasName.trim(), true);
+          if (data) finalOfertasId = data.id;
+        } catch (err) { console.error(err); }
+      }
+      
+      let finalHistoriaId = historiaId;
+      if (historiaOption === 'igreja' && historiaName && !historiaId) {
+        try {
+          const data = await createPersonAdmin(historiaName.trim(), true);
+          if (data) finalHistoriaId = data.id;
+        } catch (err) { console.error(err); }
+      }
+
       const payload = {
         title: title.trim(),
         event_type_id: eventTypeId,
@@ -223,8 +354,8 @@ function NovoEventoWizard() {
         end_time: endTime || null,
         location_id: locationId || null,
         ministry_id: ministryId || null,
-        preacher_id: preacherId || null,
-        worship_leader_id: worshipLeaderId || null,
+        preacher_id: finalPreacherId || null,
+        worship_leader_id: finalWorshipLeaderId || null,
         sound_person_id: soundPersonId || null,
         responsible_person_id: responsibleId || null,
         notes: finalNotes || null,
@@ -235,7 +366,38 @@ function NovoEventoWizard() {
         status: 'scheduled'
       };
 
-      const { data: insertedEvent, error } = await supabase.from('events').insert(payload).select().single();
+      // Verifica se já existe um rascunho de escala para este dia e horário
+      const { data: draftEvent } = await supabase
+        .from('events')
+        .select('id')
+        .eq('date', date)
+        .eq('start_time', startTime)
+        .eq('status', 'draft')
+        .maybeSingle();
+
+      let insertedEvent;
+      let error;
+
+      if (draftEvent) {
+        // Aproveita o rascunho existente (as escalas já feitas continuarão vinculadas)
+        const res = await supabase
+          .from('events')
+          .update(payload)
+          .eq('id', draftEvent.id)
+          .select()
+          .single();
+        insertedEvent = res.data;
+        error = res.error;
+      } else {
+        // Cria um novo evento
+        const res = await supabase
+          .from('events')
+          .insert(payload)
+          .select()
+          .single();
+        insertedEvent = res.data;
+        error = res.error;
+      }
       
       if (error) throw error;
       
@@ -249,8 +411,8 @@ function NovoEventoWizard() {
 
       // Create schedule entries for assigned people
       const scheduleEntries = [];
-      if (preacherId) scheduleEntries.push({ event_id: insertedEvent.id, person_id: preacherId, date, start_time: startTime, end_time: endTime || null });
-      if (worshipLeaderId) scheduleEntries.push({ event_id: insertedEvent.id, person_id: worshipLeaderId, date, start_time: startTime, end_time: endTime || null });
+      if (finalPreacherId) scheduleEntries.push({ event_id: insertedEvent.id, person_id: finalPreacherId, date, start_time: startTime, end_time: endTime || null });
+      if (finalWorshipLeaderId) scheduleEntries.push({ event_id: insertedEvent.id, person_id: finalWorshipLeaderId, date, start_time: startTime, end_time: endTime || null });
       if (soundPersonId) scheduleEntries.push({ event_id: insertedEvent.id, person_id: soundPersonId, date, start_time: startTime, end_time: endTime || null });
       if (responsibleId) scheduleEntries.push({ event_id: insertedEvent.id, person_id: responsibleId, date, start_time: startTime, end_time: endTime || null });
 
@@ -258,16 +420,16 @@ function NovoEventoWizard() {
         await supabase.from('schedules').insert(scheduleEntries);
       }
 
-      if (ofertasId || historiaId) {
+      if (finalOfertasId || finalHistoriaId) {
         const rolesData = await supabase.from('roles').select('id, name').in('name', ['Ofertas', 'História das Crianças']);
         const epPayload = [];
-        if (ofertasId && rolesData.data) {
+        if (finalOfertasId && rolesData.data) {
            const r = rolesData.data.find(r => r.name === 'Ofertas');
-           if (r) epPayload.push({ event_id: insertedEvent.id, role_id: r.id, person_id: ofertasId });
+           if (r) epPayload.push({ event_id: insertedEvent.id, role_id: r.id, person_id: finalOfertasId });
         }
-        if (historiaId && rolesData.data) {
+        if (finalHistoriaId && rolesData.data) {
            const r = rolesData.data.find(r => r.name === 'História das Crianças');
-           if (r) epPayload.push({ event_id: insertedEvent.id, role_id: r.id, person_id: historiaId });
+           if (r) epPayload.push({ event_id: insertedEvent.id, role_id: r.id, person_id: finalHistoriaId });
         }
         if (epPayload.length > 0) await supabase.from('event_participants').insert(epPayload);
       }
@@ -523,53 +685,85 @@ function NovoEventoWizard() {
                     
                     <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
                       <label className="form-label">🎤 Pregação</label>
-                      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
-                        <button className={`btn ${preacherOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setPreacherOption('ministerio'); setPreacherId(''); setPreacherName(''); }}>Nosso Ministério fará</button>
-                        <button className={`btn ${preacherOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setPreacherOption('igreja'); setPreacherId(''); setPreacherName(''); }}>Liderança da Igreja define</button>
-                      </div>
-                      {preacherOption === 'igreja' && (
-                        <div style={{ marginTop: 'var(--space-2)' }}>
-                          <PersonAutocomplete onSelect={(person, name) => { setPreacherId(person?.id || ''); setPreacherName(person?.name || name); }} placeholder="Nome (opcional)" />
+                      {draftRoles.preacher ? (
+                        <div style={{ padding: 'var(--space-3)', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--primary)' }}>✓ Definido na Escala:</span> {preacherName}
                         </div>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
+                            <button className={`btn ${preacherOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setPreacherOption('ministerio'); setPreacherId(''); setPreacherName(''); }}>Nosso Ministério fará</button>
+                            <button className={`btn ${preacherOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setPreacherOption('igreja'); setPreacherId(''); setPreacherName(''); }}>Liderança da Igreja define</button>
+                          </div>
+                          {preacherOption === 'igreja' && (
+                            <div style={{ marginTop: 'var(--space-2)' }}>
+                              <PersonAutocomplete onSelect={(person, name) => { setPreacherId(person?.id || ''); setPreacherName(person?.name || name); }} placeholder="Nome (opcional)" />
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                     
                     <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
                       <label className="form-label">🎵 Música / Louvor</label>
-                      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
-                        <button className={`btn ${worshipOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setWorshipOption('ministerio'); setWorshipLeaderId(''); setWorshipLeaderName(''); }}>Nosso Ministério fará</button>
-                        <button className={`btn ${worshipOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setWorshipOption('igreja'); setWorshipLeaderId(''); setWorshipLeaderName(''); }}>Equipe de Música Oficial</button>
-                      </div>
-                      {worshipOption === 'igreja' && (
-                        <div style={{ marginTop: 'var(--space-2)' }}>
-                          <PersonAutocomplete onSelect={(person, name) => { setWorshipLeaderId(person?.id || ''); setWorshipLeaderName(person?.name || name); }} placeholder="Nome (opcional)" />
+                      {draftRoles.worship ? (
+                        <div style={{ padding: 'var(--space-3)', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--primary)' }}>✓ Definido na Escala:</span> {worshipLeaderName}
                         </div>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
+                            <button className={`btn ${worshipOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setWorshipOption('ministerio'); setWorshipLeaderId(''); setWorshipLeaderName(''); }}>Nosso Ministério fará</button>
+                            <button className={`btn ${worshipOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setWorshipOption('igreja'); setWorshipLeaderId(''); setWorshipLeaderName(''); }}>Equipe de Música Oficial</button>
+                          </div>
+                          {worshipOption === 'igreja' && (
+                            <div style={{ marginTop: 'var(--space-2)' }}>
+                              <PersonAutocomplete onSelect={(person, name) => { setWorshipLeaderId(person?.id || ''); setWorshipLeaderName(person?.name || name); }} placeholder="Nome (opcional)" />
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
 
                     <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
                       <label className="form-label">💰 Dízimos e Ofertas</label>
-                      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
-                        <button className={`btn ${ofertasOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setOfertasOption('ministerio'); setOfertasId(''); setOfertasName(''); }}>Nosso Ministério fará</button>
-                        <button className={`btn ${ofertasOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setOfertasOption('igreja'); setOfertasId(''); setOfertasName(''); }}>Diaconato Oficial fará</button>
-                      </div>
-                      {ofertasOption === 'igreja' && (
-                        <div style={{ marginTop: 'var(--space-2)' }}>
-                          <PersonAutocomplete onSelect={(person, name) => { setOfertasId(person?.id || ''); setOfertasName(person?.name || name); }} placeholder="Nome (opcional)" />
+                      {draftRoles.ofertas ? (
+                        <div style={{ padding: 'var(--space-3)', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--primary)' }}>✓ Definido na Escala:</span> {ofertasName}
                         </div>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
+                            <button className={`btn ${ofertasOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setOfertasOption('ministerio'); setOfertasId(''); setOfertasName(''); }}>Nosso Ministério fará</button>
+                            <button className={`btn ${ofertasOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setOfertasOption('igreja'); setOfertasId(''); setOfertasName(''); }}>Diaconato Oficial fará</button>
+                          </div>
+                          {ofertasOption === 'igreja' && (
+                            <div style={{ marginTop: 'var(--space-2)' }}>
+                              <PersonAutocomplete onSelect={(person, name) => { setOfertasId(person?.id || ''); setOfertasName(person?.name || name); }} placeholder="Nome (opcional)" />
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
 
                     <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
                       <label className="form-label">🧸 História das Crianças</label>
-                      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
-                        <button className={`btn ${historiaOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setHistoriaOption('ministerio'); setHistoriaId(''); setHistoriaName(''); }}>Nosso Ministério fará</button>
-                        <button className={`btn ${historiaOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setHistoriaOption('igreja'); setHistoriaId(''); setHistoriaName(''); }}>Ministério da Criança Oficial</button>
-                      </div>
-                      {historiaOption === 'igreja' && (
-                        <div style={{ marginTop: 'var(--space-2)' }}>
-                          <PersonAutocomplete onSelect={(person, name) => { setHistoriaId(person?.id || ''); setHistoriaName(person?.name || name); }} placeholder="Nome (opcional)" />
+                      {draftRoles.historia ? (
+                        <div style={{ padding: 'var(--space-3)', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--primary)' }}>✓ Definido na Escala:</span> {historiaName}
                         </div>
+                      ) : (
+                        <>
+                          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
+                            <button className={`btn ${historiaOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setHistoriaOption('ministerio'); setHistoriaId(''); setHistoriaName(''); }}>Nosso Ministério fará</button>
+                            <button className={`btn ${historiaOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setHistoriaOption('igreja'); setHistoriaId(''); setHistoriaName(''); }}>Ministério da Criança Oficial</button>
+                          </div>
+                          {historiaOption === 'igreja' && (
+                            <div style={{ marginTop: 'var(--space-2)' }}>
+                              <PersonAutocomplete onSelect={(person, name) => { setHistoriaId(person?.id || ''); setHistoriaName(person?.name || name); }} placeholder="Nome (opcional)" />
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>

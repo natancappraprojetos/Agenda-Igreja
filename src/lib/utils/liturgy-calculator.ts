@@ -7,7 +7,8 @@ import type { LiturgyItem } from '@/lib/types';
 /**
  * Parses a time string (HH:MM or HH:MM:SS) to total minutes from midnight
  */
-export function timeToMinutes(time: string): number {
+export function timeToMinutes(time: string | null | undefined): number {
+  if (!time) return 0;
   const parts = time.split(':').map(Number);
   return parts[0] * 60 + parts[1];
 }

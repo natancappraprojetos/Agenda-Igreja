@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import Header from '@/components/layout/Header';
-import EscalasGrid from '@/components/ui/EscalasGrid';
+import EscalasCalendar from '@/components/ui/EscalasCalendar';
 import { BookOpen, Mic, Headset, Shield, CalendarIcon } from 'lucide-react';
 
 export default function EscalasPage() {
@@ -65,12 +65,12 @@ export default function EscalasPage() {
               <span style={{ fontWeight: 600, color: 'var(--text)' }}>Visão de Liderança</span>
             </div>
             <p style={{ margin: 'var(--space-2) 0 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              Selecione o nome da pessoa na data desejada para escalar automaticamente. Essa alteração refletirá instantaneamente na Agenda Geral e no painel do Culto.
+              Selecione o evento desejado no calendário abaixo para atribuir as funções. Os espaços de rascunho (tracejados) foram criados especificamente para gerenciar a escala e não aparecem na Agenda Geral pública.
             </p>
           </div>
 
           {activeTab === 'pregadores' && canSeeAll && (
-            <EscalasGrid 
+            <EscalasCalendar 
               title="Escala de Pregadores" 
               icon={<BookOpen size={20} color="var(--primary)" />}
               eventTypesToInclude={['Culto', 'Programa Jovem', 'Desbravadores', 'Batismo', 'Evento Especial']}
@@ -79,16 +79,16 @@ export default function EscalasPage() {
           )}
 
           {activeTab === 'musica' && canSeeMusica && (
-            <EscalasGrid 
+            <EscalasCalendar 
               title="Escala do Ministério da Música" 
               icon={<Mic size={20} color="var(--primary)" />}
               eventTypesToInclude={['Culto', 'Programa Jovem', 'Desbravadores', 'Batismo', 'Evento Especial']}
-              rolesToManage={['Cantor(a) Solo', 'Cantor(a) Congregacional']}
+              rolesToManage={['Líder de Louvor', 'Cantor(a) Solo', 'Cantor(a) Congregacional']}
             />
           )}
 
           {activeTab === 'sonoplastia' && canSeeSonoplastia && (
-            <EscalasGrid 
+            <EscalasCalendar 
               title="Escala de Sonoplastia" 
               icon={<Headset size={20} color="var(--primary)" />}
               eventTypesToInclude={['Culto', 'Programa Jovem', 'Desbravadores', 'Batismo', 'Evento Especial']}
@@ -97,7 +97,7 @@ export default function EscalasPage() {
           )}
 
           {activeTab === 'diaconato' && canSeeDiaconato && (
-            <EscalasGrid 
+            <EscalasCalendar 
               title="Escala de Diaconato" 
               icon={<Shield size={20} color="var(--primary)" />}
               eventTypesToInclude={['Culto', 'Programa Jovem', 'Desbravadores', 'Batismo', 'Evento Especial']}

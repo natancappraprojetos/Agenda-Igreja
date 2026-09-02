@@ -35,7 +35,8 @@ export default function MinhaAgendaPage() {
       .order('date', { ascending: true })
       .order('start_time', { ascending: true });
 
-    setSchedules((data || []) as unknown as Schedule[]);
+    const filteredData = (data || []).filter((s: any) => s.event?.status !== 'draft');
+    setSchedules(filteredData as unknown as Schedule[]);
     setLoading(false);
   }, [person, supabase]);
 

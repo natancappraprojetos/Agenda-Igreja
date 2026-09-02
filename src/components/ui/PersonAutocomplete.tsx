@@ -36,8 +36,6 @@ export default function PersonAutocomplete({ onSelect, placeholder = 'Nome da pe
   }, []);
 
   useEffect(() => {
-    onSelect(null, searchTerm);
-
     if (searchTerm.length >= 2) {
       const fetchSuggestions = async () => {
         const { data } = await supabase
@@ -166,7 +164,6 @@ export default function PersonAutocomplete({ onSelect, placeholder = 'Nome da pe
                 onClick={() => handleSelect(person)}
               >
                 <span style={{ fontWeight: 500 }}>{person.name}</span>
-                {person.whatsapp && <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{person.whatsapp}</span>}
               </div>
             ))}
             

@@ -130,7 +130,7 @@ export default function AgendaPage() {
         `)
         .gte('date', startDate)
         .lte('date', endDate)
-        .neq('status', 'cancelled')
+        .in('status', ['scheduled', 'confirmed', 'completed'])
         .order('date', { ascending: true })
         .order('start_time', { ascending: true });
 
@@ -481,53 +481,66 @@ export default function AgendaPage() {
 
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border-light)', margin: 'var(--space-4) 0' }} />
 
-                <div className="review-grid">
-                  <div className="review-section" style={{ overflow: 'visible' }}>
-                    <div className="review-label">🔊 Sonoplastia</div>
-                    <div className="review-value">
-                        <PersonSelect 
-                          value={selectedEvent.sound_person_id || ''} 
-                          onChange={(val) => handleUpdateRole(selectedEvent.id, 'sound_person_id', val)} 
-                          placeholder="Definir..." 
-                        />
+                {(() => {
+                  const getPersonId = (colVal: any, roleNames: string[]) => {
+                    if (colVal) return colVal;
+                    const p = eventParticipants.find(p => roleNames.some(rn => p.role?.name?.toLowerCase().includes(rn.toLowerCase())));
+                    return p ? p.person_id : '';
+                  };
+                  
+                  const resolvedSoundPersonId = getPersonId(selectedEvent.sound_person_id, ['sonoplasta', 'sonoplastia']);
+                  const resolvedPreacherId = getPersonId(selectedEvent.preacher_id, ['pregador']);
+                  const resolvedWorshipId = getPersonId(selectedEvent.worship_leader_id, ['líder de louvor', 'música']);
+                  const resolvedResponsibleId = getPersonId(selectedEvent.responsible_person_id, ['responsável']);
+
+                  return (
+                    <div className="review-grid">
+                      <div className="review-section" style={{ overflow: 'visible' }}>
+                        <div className="review-label">🔊 Sonoplastia</div>
+                        <div className="review-value">
+                            <PersonSelect 
+                              value={resolvedSoundPersonId} 
+                              onChange={(val) => handleUpdateRole(selectedEvent.id, 'sound_person_id', val)} 
+                              placeholder="Definir..." 
+                            />
+                        </div>
+                      </div>
+
+                      <div className="review-section" style={{ overflow: 'visible' }}>
+                        <div className="review-label">🎤 Pregador</div>
+                        <div className="review-value">
+                            <PersonSelect 
+                              value={resolvedPreacherId} 
+                              onChange={(val) => handleUpdateRole(selectedEvent.id, 'preacher_id', val)} 
+                              placeholder="Definir..." 
+                            />
+                        </div>
+                      </div>
+
+                      <div className="review-section" style={{ overflow: 'visible' }}>
+                        <div className="review-label">🎵 Louvor</div>
+                        <div className="review-value">
+                            <PersonSelect 
+                              value={resolvedWorshipId} 
+                              onChange={(val) => handleUpdateRole(selectedEvent.id, 'worship_leader_id', val)} 
+                              placeholder="Definir..." 
+                            />
+                        </div>
+                      </div>
+
+                      <div className="review-section" style={{ overflow: 'visible' }}>
+                        <div className="review-label">👤 Responsável</div>
+                        <div className="review-value">
+                            <PersonSelect 
+                              value={resolvedResponsibleId} 
+                              onChange={(val) => handleUpdateRole(selectedEvent.id, 'responsible_person_id', val)} 
+                              placeholder="Definir..." 
+                            />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="review-section" style={{ overflow: 'visible' }}>
-                    <div className="review-label">🎤 Pregador</div>
-                    <div className="review-value">
-                        <PersonSelect 
-                          value={selectedEvent.preacher_id || ''} 
-                          onChange={(val) => handleUpdateRole(selectedEvent.id, 'preacher_id', val)} 
-                          placeholder="Definir..." 
-                        />
-                    </div>
-                  </div>
-
-                  <div className="review-section" style={{ overflow: 'visible' }}>
-                    <div className="review-label">🎵 Louvor</div>
-                    <div className="review-value">
-                        <PersonSelect 
-                          value={selectedEvent.worship_leader_id || ''} 
-                          onChange={(val) => handleUpdateRole(selectedEvent.id, 'worship_leader_id', val)} 
-                          placeholder="Definir..." 
-                        />
-                    </div>
-                  </div>
-
-
-
-                  <div className="review-section" style={{ overflow: 'visible' }}>
-                    <div className="review-label">👤 Responsável</div>
-                    <div className="review-value">
-                        <PersonSelect 
-                          value={selectedEvent.responsible_person_id || ''} 
-                          onChange={(val) => handleUpdateRole(selectedEvent.id, 'responsible_person_id', val)} 
-                          placeholder="Definir..." 
-                        />
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* FUNÇÕES EXTRAS (LITURGIA/ESCALAS) */}
                 {(() => {

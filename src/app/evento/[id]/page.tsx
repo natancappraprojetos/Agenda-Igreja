@@ -15,6 +15,7 @@ export default async function PublicEventDetailsPage({ params }: { params: { id:
       location:locations(name)
     `)
     .eq('id', params.id)
+    .neq('status', 'draft')
     .single();
 
   if (!event) {

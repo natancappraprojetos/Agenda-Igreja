@@ -96,8 +96,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             Novo Evento
           </Link>
 
-          {/* Pendências e Visão Geral apenas para Admin e Liderança */}
-          {(isAdmin || isLeadership) && navItems.filter(item => item.href !== '/' && item.href !== '/eventos/novo').map(item => (
+          {/* Pendências e Visão Geral apenas para Admin e Liderança Estrita (música, som, diácono) */}
+          {(isAdmin || isStrictLeader) && navItems.filter(item => item.href !== '/' && item.href !== '/eventos/novo').map(item => (
             <Link
               key={item.href}
               href={item.href}
@@ -109,7 +109,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             </Link>
           ))}
 
-          {/* Escalas é público, então a seção Cadastros sempre renderiza (mas os itens são filtrados) */}
+          {/* Seção Cadastros */}
           {(true) && (
             <>
               <div className="sidebar-section">
@@ -117,16 +117,22 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               </div>
 
               {cadastrosItems.map(item => {
-                // Non-admins don't see global Pessoas. If they have a team, they see Minha Equipe instead.
+                // Non-admins don't see global Pessoas. If they have a team, they see Minha Equipe (or Lista de Pregadores).
                 if (!isAdmin && item.href === '/pessoas') {
                   if (hasTeam) {
+                    const equipeLabel = (!isStrictLeader && roles.includes('anciao')) ? 'Lista de Pregadores' : 'Minha Equipe';
                     return (
                       <Link key="/equipe" href="/equipe" className={`sidebar-link ${isActive('/equipe') ? 'active' : ''}`} onClick={onClose}>
                         <span className="sidebar-link-icon"><Users size={20} /></span>
-                        Minha Equipe
+                        {equipeLabel}
                       </Link>
                     );
                   }
+                  return null;
+                }
+
+                // Locais e Ministérios são exclusivos para Admin
+                if (!isAdmin && (item.href === '/ministerios' || item.href === '/locais')) {
                   return null;
                 }
 

@@ -47,15 +47,19 @@ export default function HistoricoPage() {
 
     const logsData = data || [];
     
-    // Fetch profiles manually
+    // Fetch users and their person names
     const userIds = [...new Set(logsData.map(l => l.user_id).filter(Boolean))];
     if (userIds.length > 0) {
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, name')
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, person:people(name)')
         .in('id', userIds);
         
-      const profileMap = Object.fromEntries((profilesData || []).map(p => [p.id, p.name]));
+      if (usersError) console.error('Error fetching users for logs:', usersError);
+        
+      const profileMap = Object.fromEntries(
+        (usersData || []).map((u: any) => [u.id, u.person?.name || 'Administrador do Sistema'])
+      );
       
       const enrichedLogs = logsData.map(log => ({
         ...log,

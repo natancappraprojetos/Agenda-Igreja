@@ -5,8 +5,10 @@ import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import type { EventType, Location, Ministry } from '@/lib/types';
 import { useToast } from '@/lib/hooks/useToast';
+import SearchSelect from '@/components/ui/SearchSelect';
 import PersonSelect from '@/components/ui/PersonSelect';
 import PersonAutocomplete from '@/components/ui/PersonAutocomplete';
+import { createPersonAdmin } from '@/app/actions';
 
 const TOTAL_STEPS = 8;
 
@@ -57,6 +59,13 @@ export default function PublicAgendarWizard() {
   const [ofertasName, setOfertasName] = useState('');
   const [historiaId, setHistoriaId] = useState('');
   const [historiaName, setHistoriaName] = useState('');
+
+  const [draftRoles, setDraftRoles] = useState({
+    preacher: false,
+    worship: false,
+    ofertas: false,
+    historia: false
+  });
 
   // Conflicts
   const [locationConflicts, setLocationConflicts] = useState<Array<any>>([]);
@@ -123,7 +132,94 @@ export default function PublicAgendarWizard() {
 
   useEffect(() => { checkLocationConflict(); }, [checkLocationConflict]);
 
-  const isCulto = !!eventTypes.find(t => t.id === eventTypeId)?.name.toLowerCase().match(/culto|jovem|desbravador|batismo|especial|sabatina/);
+  // Fetch draft event to pre-fill scales
+  const checkDraftEvent = useCallback(async () => {
+    if (!date || !startTime) return;
+    
+    const { data: draftEvent } = await supabase
+      .from('events')
+      .select('id, preacher_id, worship_leader_id, sound_person_id, preacher:people!events_preacher_id_fkey(id, name), worship:people!events_worship_leader_id_fkey(id, name)')
+      .eq('date', date)
+      .eq('start_time', startTime)
+      .eq('status', 'draft')
+      .maybeSingle();
+
+    if (draftEvent) {
+      const newDraftRoles = { preacher: false, worship: false, ofertas: false, historia: false };
+      
+      const { data: parts } = await supabase
+         .from('event_participants')
+         .select('*, role:roles(name), person:people(name)')
+         .eq('event_id', draftEvent.id);
+         
+      if (parts) {
+         // Check Preacher in participants first
+         const pregadorPart = parts.find(p => p.role?.name?.includes('Pregador'));
+         if (pregadorPart) {
+            setPreacherOption('igreja');
+            setPreacherId(pregadorPart.person_id);
+            setPreacherName(pregadorPart.person?.name || '');
+            newDraftRoles.preacher = true;
+         } else if (draftEvent.preacher_id) {
+            setPreacherOption('igreja');
+            setPreacherId(draftEvent.preacher_id);
+            setPreacherName(draftEvent.preacher?.name || '');
+            newDraftRoles.preacher = true;
+         }
+
+         // Check Worship Leader in participants first
+         const louvorPart = parts.find(p => p.role?.name?.includes('Líder de Louvor') || p.role?.name?.includes('Música'));
+         if (louvorPart) {
+            setWorshipOption('igreja');
+            setWorshipLeaderId(louvorPart.person_id);
+            setWorshipLeaderName(louvorPart.person?.name || '');
+            newDraftRoles.worship = true;
+         } else if (draftEvent.worship_leader_id) {
+            setWorshipOption('igreja');
+            setWorshipLeaderId(draftEvent.worship_leader_id);
+            setWorshipLeaderName(draftEvent.worship?.name || '');
+            newDraftRoles.worship = true;
+         }
+         
+         const ofertas = parts.find(p => p.role?.name === 'Ofertas' || p.role?.name === 'Diácono' || p.role?.name === 'Diácono/Diaconisa');
+         if (ofertas) {
+            setOfertasOption('igreja');
+            setOfertasId(ofertas.person_id);
+            setOfertasName(ofertas.person?.name || '');
+            newDraftRoles.ofertas = true;
+         }
+         
+         const historia = parts.find(p => p.role?.name === 'História das Crianças');
+         if (historia) {
+            setHistoriaOption('igreja');
+            setHistoriaId(historia.person_id);
+            setHistoriaName(historia.person?.name || '');
+            newDraftRoles.historia = true;
+         }
+      } else {
+         // Fallback if no parts but has event columns
+         if (draftEvent.preacher_id) {
+            setPreacherOption('igreja');
+            setPreacherId(draftEvent.preacher_id);
+            setPreacherName(draftEvent.preacher?.name || '');
+            newDraftRoles.preacher = true;
+         }
+         if (draftEvent.worship_leader_id) {
+            setWorshipOption('igreja');
+            setWorshipLeaderId(draftEvent.worship_leader_id);
+            setWorshipLeaderName(draftEvent.worship?.name || '');
+            newDraftRoles.worship = true;
+         }
+      }
+      setDraftRoles(newDraftRoles);
+    } else {
+      setDraftRoles({ preacher: false, worship: false, ofertas: false, historia: false });
+    }
+  }, [date, startTime, supabase]);
+
+  useEffect(() => { checkDraftEvent(); }, [checkDraftEvent]);
+
+  const isCulto = !!eventTypes.find(t => t.id === eventTypeId)?.name.toLowerCase().match(/culto|jovem|especial|sabatina/);
 
   useEffect(() => {
     if (isCulto && locations.length > 0 && !locationId) {
@@ -134,7 +230,18 @@ export default function PublicAgendarWizard() {
 
   // Check existing cultos to link sub-events
   const checkExistingCultos = useCallback(async () => {
-    if (!date) return;
+    if (!date || isCulto) {
+      setExistingCultos([]);
+      return;
+    }
+    
+    // Only 'Batismo' and 'Dedicação' should ask to link to a Culto
+    const currentTypeName = eventTypes.find(t => t.id === eventTypeId)?.name?.toLowerCase() || '';
+    if (!currentTypeName.includes('batismo') && !currentTypeName.includes('dedicação')) {
+      setExistingCultos([]);
+      return;
+    }
+
     const cultoTypes = eventTypes.filter(t => t.name.toLowerCase().match(/culto|sabatina|jovem/)).map(t => t.id);
     if (cultoTypes.length === 0) return;
 
@@ -144,22 +251,31 @@ export default function PublicAgendarWizard() {
       .in('event_type_id', cultoTypes)
       .eq('date', date)
       .in('status', ['scheduled', 'confirmed'])
-      .order('start_time');
-    setExistingCultos(data || []);
-  }, [date, eventTypes, supabase]);
+    if (data && data.length > 0) {
+      setExistingCultos(data);
+      setParentEventId(prev => prev || data[0].id);
+    } else {
+      setExistingCultos([]);
+    }
+  }, [date, eventTypes, eventTypeId, isCulto, supabase]);
 
   useEffect(() => { checkExistingCultos(); }, [checkExistingCultos]);
 
   const canProceed = () => {
     switch (step) {
       case 1: return !!eventTypeId;
-      case 2: return !!date && !!startTime && !!title;
-      case 3: return true; // location is optional in UI? Wait, UI doesn't force it.
-      case 4: return true; // ministry is optional
-      case 5: return true; // needs optional
-      case 6: return true; // participants optional
+      case 2: 
+        if (!isCulto && existingCultos.length > 0) {
+          if (parentEventId !== '') return true;
+          return !!startTime; // if separate event, needs time
+        }
+        return !!date && !!startTime && !!title;
+      case 3: return true;
+      case 4: return true;
+      case 5: return true;
+      case 6: return true;
       case 7: return !!solicitanteId && (solicitanteId !== 'outro' || !!solicitante);
-      case 8: return true; // review
+      case 8: return true;
       default: return false;
     }
   };
@@ -169,9 +285,15 @@ export default function PublicAgendarWizard() {
      if (isCulto) path.push(1.5);
      path.push(2);
      if (!parentEventId && !isCulto) path.push(3); // Skip location if linked or if Culto
-     path.push(4); // Ministry
-     if (!parentEventId) path.push(5); // Skip needs if linked
+     
+     path.push(4); // Ministry (Always show)
+     
+     if (!parentEventId) {
+       path.push(5); // Needs (Skip if linked)
+     }
+     
      if (!parentEventId && isCulto && ministryId) path.push(6); // Skip questionnaire if linked or not Culto
+     
      path.push(7);
      path.push(8);
      return path;
@@ -199,13 +321,13 @@ export default function PublicAgendarWizard() {
       // General conflict check (same time)
       const { data: conflicts, error: conflictError } = await supabase
         .from('events')
-        .select('id, title, start_time')
+        .select('id, title, start_time, status')
         .eq('date', date)
         .neq('status', 'cancelled');
         
       if (conflictError) throw conflictError;
 
-      const exactConflict = conflicts?.find(c => c.start_time.substring(0, 5) === startTime);
+      const exactConflict = conflicts?.find(c => c.start_time.substring(0, 5) === startTime && c.status !== 'draft');
       if (exactConflict) {
         if (!confirm(`⚠️ Atenção: Já existe um evento ("${exactConflict.title}") agendado para o mesmo dia às ${startTime}. Deseja agendar neste horário mesmo assim? (Pode ser em outro local da igreja)`)) {
           setSaving(false);
@@ -247,6 +369,38 @@ export default function PublicAgendarWizard() {
          }
       }
 
+      let finalPreacherId = preacherId;
+      if (preacherOption === 'igreja' && preacherName && !preacherId) {
+        try {
+          const data = await createPersonAdmin(preacherName.trim(), true);
+          if (data) finalPreacherId = data.id;
+        } catch (err) { console.error('Error creating preacher:', err); }
+      }
+      
+      let finalWorshipLeaderId = worshipLeaderId;
+      if (worshipOption === 'igreja' && worshipLeaderName && !worshipLeaderId) {
+        try {
+          const data = await createPersonAdmin(worshipLeaderName.trim(), true);
+          if (data) finalWorshipLeaderId = data.id;
+        } catch (err) { console.error('Error creating worship leader:', err); }
+      }
+      
+      let finalOfertasId = ofertasId;
+      if (ofertasOption === 'igreja' && ofertasName && !ofertasId) {
+        try {
+          const data = await createPersonAdmin(ofertasName.trim(), true);
+          if (data) finalOfertasId = data.id;
+        } catch (err) { console.error('Error creating ofertas person:', err); }
+      }
+      
+      let finalHistoriaId = historiaId;
+      if (historiaOption === 'igreja' && historiaName && !historiaId) {
+        try {
+          const data = await createPersonAdmin(historiaName.trim(), true);
+          if (data) finalHistoriaId = data.id;
+        } catch (err) { console.error('Error creating historia person:', err); }
+      }
+
       const personName = solicitanteId === 'outro' ? solicitante.trim() : (people.find(p => p.id === solicitanteId)?.name || solicitante.trim());
 
       const payload = {
@@ -263,12 +417,45 @@ export default function PublicAgendarWizard() {
         needs_sound: isCulto,
         needs_worship: isCulto,
         needs_deaconry: isCulto,
-        preacher_id: preacherId || null,
-        worship_leader_id: worshipLeaderId || null,
+        preacher_id: finalPreacherId || null,
+        worship_leader_id: finalWorshipLeaderId || null,
+        responsible_person_id: solicitanteId === 'outro' ? null : solicitanteId,
         status: 'scheduled'
       };
 
-      const { data: insertedEvent, error } = await supabase.from('events').insert(payload).select().single();
+      // Verifica se já existe um rascunho de escala para este dia e horário
+      const { data: draftEvent } = await supabase
+        .from('events')
+        .select('id')
+        .eq('date', date)
+        .eq('start_time', startTime)
+        .eq('status', 'draft')
+        .maybeSingle();
+
+      let insertedEvent;
+      let error;
+
+      if (draftEvent) {
+        // Aproveita o rascunho existente (as escalas já feitas continuarão vinculadas)
+        const res = await supabase
+          .from('events')
+          .update(payload)
+          .eq('id', draftEvent.id)
+          .select()
+          .single();
+        insertedEvent = res.data;
+        error = res.error;
+      } else {
+        // Cria um novo evento
+        const res = await supabase
+          .from('events')
+          .insert(payload)
+          .select()
+          .single();
+        insertedEvent = res.data;
+        error = res.error;
+      }
+      
       if (error) throw error;
 
       if (selectedNeeds.length > 0 && insertedEvent) {
@@ -423,46 +610,82 @@ export default function PublicAgendarWizard() {
               </div>
             )}
 
-            {/* Step 2: Date & Time */}
+            {/* Step 2: Date & Time or Link Prompt */}
             {step === 2 && (
               <div className="wizard-step">
-                <h2 className="wizard-step-title">Quando será?</h2>
-                <div className="form-group">
-                  <label className="form-label">📅 Data</label>
-                  <input type="date" className="form-input" value={date} onChange={e => setDate(e.target.value)} />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', alignItems: 'end' }}>
-                  <div className="form-group">
-                    <label className="form-label">Horário de Início *</label>
-                    <input type="time" className="form-input" value={startTime} onChange={e => setStartTime(e.target.value)} required />
+                {!isCulto && existingCultos.length > 0 ? (
+                  // Sub-Event with Existing Culto - Dedicated Link Screen
+                  <div style={{ textAlign: 'center', padding: 'var(--space-4) 0' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>⛪</div>
+                    <h2 className="wizard-step-title" style={{ fontSize: '1.5rem', marginBottom: 'var(--space-2)' }}>Já tem um culto nesse dia!</h2>
+                    <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-6)' }}>
+                      Deseja que este evento (Ex: Batismo) seja parte da programação do culto?
+                    </p>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                      {existingCultos.map(culto => (
+                        <button 
+                          key={culto.id}
+                          className={`btn ${parentEventId === culto.id ? 'btn-primary' : 'btn-secondary'} btn-lg`}
+                          onClick={() => {
+                            setParentEventId(culto.id);
+                            setStartTime(culto.start_time);
+                            setTimeout(() => setStep(4), 300);
+                          }}
+                        >
+                          Sim, agregar ao {culto.title}
+                        </button>
+                      ))}
+                      
+                      <button 
+                        className={`btn ${parentEventId === '' ? 'btn-primary' : 'btn-ghost'} btn-lg`}
+                        onClick={() => setParentEventId('')}
+                        style={{ marginTop: 'var(--space-4)' }}
+                      >
+                        Não, este é um evento separado
+                      </button>
+                    </div>
+
+                    {parentEventId === '' && (
+                      <div style={{ marginTop: 'var(--space-6)', textAlign: 'left', animation: 'fadeIn 0.3s ease' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+                          <div className="form-group">
+                            <label className="form-label">Horário de Início *</label>
+                            <input type="time" className="form-input" value={startTime} onChange={e => setStartTime(e.target.value)} required />
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Horário de Fim</label>
+                            <input type="time" className="form-input" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Horário de Fim (Opcional)</label>
-                    <input type="time" className="form-input" value={endTime} onChange={e => setEndTime(e.target.value)} />
-                  </div>
-                </div>
-                
-                {!isCulto && existingCultos.length > 0 && (
-                  <div className="alert bg-blue-50 border-blue-200" style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary-color)' }}>
-                    <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--primary-color)', marginBottom: 'var(--space-2)' }}>Vincular ao Culto?</h3>
-                    <p style={{ fontSize: '0.875rem', marginBottom: 'var(--space-3)' }}>Identificamos que haverá culto neste dia. Deseja que este evento (ex: Batismo, Comissão) seja parte da programação do culto?</p>
-                    {existingCultos.map(culto => (
-                      <label key={culto.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', fontSize: '0.9rem', cursor: 'pointer' }}>
-                        <input type="radio" name="parentCulto" checked={parentEventId === culto.id} onChange={() => setParentEventId(culto.id)} />
-                        Sim, vincular ao {culto.title} ({culto.start_time.slice(0, 5)})
-                      </label>
-                    ))}
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: '0.9rem', cursor: 'pointer' }}>
-                      <input type="radio" name="parentCulto" checked={parentEventId === ''} onChange={() => setParentEventId('')} />
-                      Não, este é um evento separado
-                    </label>
-                  </div>
+                ) : (
+                  // Normal Date/Time Screen
+                  <>
+                    <h2 className="wizard-step-title">Quando será?</h2>
+                    <div className="form-group">
+                      <label className="form-label">📅 Data</label>
+                      <input type="date" className="form-input" value={date} onChange={e => setDate(e.target.value)} />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', alignItems: 'end' }}>
+                      <div className="form-group">
+                        <label className="form-label">Horário de Início *</label>
+                        <input type="time" className="form-input" value={startTime} onChange={e => setStartTime(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Horário de Fim (Opcional)</label>
+                        <input type="time" className="form-input" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                      </div>
+                    </div>
+                    
+                    <div className="form-group">
+                      <label className="form-label">Título do Evento</label>
+                      <input type="text" className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex: Culto de Quarta" />
+                    </div>
+                  </>
                 )}
-                
-                <div className="form-group">
-                  <label className="form-label">Título do Evento</label>
-                  <input type="text" className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex: Culto de Quarta" />
-                </div>
               </div>
             )}
 
@@ -470,10 +693,24 @@ export default function PublicAgendarWizard() {
             {step === 3 && (
               <div className="wizard-step">
                 <h2 className="wizard-step-title">Onde será?</h2>
-                <select className="form-input" value={locationId} onChange={e => setLocationId(e.target.value)} size={5} style={{ height: 'auto' }}>
-                  <option value="">Não definido / Outro local</option>
-                  {locations.map(l => <option key={l.id} value={l.id} style={{ padding: '8px' }}>📍 {l.name}</option>)}
-                </select>
+                <div className="wizard-options list-mode">
+                  <div className={`wizard-option ${locationId === '' ? 'selected' : ''}`} onClick={() => {
+                    setLocationId('');
+                    setTimeout(() => setStep(4), 200);
+                  }}>
+                    <span className="wizard-option-icon">🌍</span>
+                    <span className="wizard-option-label">Não definido / Outro local</span>
+                  </div>
+                  {locations.map(l => (
+                    <div key={l.id} className={`wizard-option ${locationId === l.id ? 'selected' : ''}`} onClick={() => {
+                      setLocationId(l.id);
+                      setTimeout(() => setStep(4), 200);
+                    }}>
+                      <span className="wizard-option-icon">📍</span>
+                      <span className="wizard-option-label">{l.name}</span>
+                    </div>
+                  ))}
+                </div>
                 {locationConflicts.length > 0 && (
                   <div className="conflict-alert mt-4">
                     <span className="conflict-alert-icon">⚠️</span>
@@ -498,7 +735,7 @@ export default function PublicAgendarWizard() {
                 <div className="wizard-options list-mode">
                   <div className={`wizard-option ${ministryId === '' ? 'selected' : ''}`} onClick={() => {
                     setMinistryId('');
-                    setTimeout(() => setStep(5), 200);
+                    setTimeout(() => setStep(parentEventId ? 7 : 5), 200);
                   }}>
                     <span className="wizard-option-icon">🌐</span>
                     <span className="wizard-option-label">Geral / Toda a Igreja</span>
@@ -506,9 +743,24 @@ export default function PublicAgendarWizard() {
                   {ministries.map(m => (
                     <div key={m.id} className={`wizard-option ${ministryId === m.id ? 'selected' : ''}`} onClick={() => {
                       setMinistryId(m.id);
-                      setTimeout(() => setStep(5), 200);
+                      setTimeout(() => setStep(parentEventId ? 7 : 5), 200);
                     }}>
-                      <span className="wizard-option-icon">{m.icon || '🏛️'}</span>
+                      <span className="wizard-option-icon">
+                        {m.name.includes('Música') || m.name.includes('Louvor') ? '🎵' :
+                         m.name.includes('Jovem') ? '🌟' :
+                         m.name.includes('Desbravadores') ? '⛺' :
+                         m.name.includes('Aventureiros') ? '🏕️' :
+                         m.name.includes('Infantil') || m.name.includes('Criança') ? '🧸' :
+                         m.name.includes('Mulher') ? '👩' :
+                         m.name.includes('Família') ? '👨‍👩‍👧‍👦' :
+                         m.name.includes('Sabatina') ? '📖' :
+                         m.name.includes('Diaconato') || m.name.includes('Diaconisas') ? '🤝' :
+                         m.name.includes('Comunicação') ? '📡' :
+                         m.name.includes('Som') || m.name.includes('Sonoplastia') ? '🎛️' :
+                         m.name.includes('Ancião') || m.name.includes('Ancionato') ? '👔' :
+                         m.name.includes('Saúde') ? '🏥' :
+                         m.icon || '🏛️'}
+                      </span>
                       <span className="wizard-option-label">{m.name}</span>
                     </div>
                   ))}
@@ -522,8 +774,21 @@ export default function PublicAgendarWizard() {
                 <h2 className="wizard-step-title">Necessidades</h2>
                 <p className="wizard-step-subtitle">Marque o que o evento precisará</p>
                 {needTypes.filter(need => {
-                  if (isCulto && (need.name.toLowerCase().includes('sonoplastia') || need.name.toLowerCase().includes('louvor') || need.name.toLowerCase().includes('música') || need.name.toLowerCase().includes('diaconato'))) {
-                    return false;
+                  const n = need.name.toLowerCase();
+                  
+                  // Remove duplicate need as per user request
+                  if (n.includes('diaconato para batismo')) return false;
+
+                  if (isCulto) {
+                    // Hide implicit needs for cultos
+                    if (n.includes('sonoplastia') || n.includes('louvor') || n.includes('música') || n.includes('diaconato')) {
+                      return false;
+                    }
+                  } else {
+                    // Hide cult-only needs for non-cults (reunião, comissão)
+                    if (n.includes('batismo') || n.includes('ceia')) {
+                      return false;
+                    }
                   }
                   return true;
                 }).map(need => (
@@ -557,89 +822,121 @@ export default function PublicAgendarWizard() {
                 
                 <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
                   <label className="form-label">🎤 Pregação</label>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
-                    <button 
-                      className={`btn ${preacherOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} 
-                      onClick={() => { setPreacherOption('ministerio'); setPreacherId(''); setPreacherName(''); }}
-                    >Nosso Ministério fará</button>
-                    <button 
-                      className={`btn ${preacherOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} 
-                      onClick={() => { setPreacherOption('igreja'); setPreacherId(''); setPreacherName(''); }}
-                    >Liderança da Igreja define</button>
-                  </div>
-                  {preacherOption === 'igreja' && (
-                    <div style={{ marginTop: 'var(--space-2)' }}>
-                      <PersonAutocomplete 
-                        onSelect={(person, name) => { setPreacherId(person?.id || ''); setPreacherName(person?.name || name); }} 
-                        placeholder="Nome (opcional)" 
-                      />
+                  {draftRoles.preacher ? (
+                    <div style={{ padding: 'var(--space-3)', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--primary)' }}>✓ Definido na Escala:</span> {preacherName}
                     </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
+                        <button 
+                          className={`btn ${preacherOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} 
+                          onClick={() => { setPreacherOption('ministerio'); setPreacherId(''); setPreacherName(''); }}
+                        >Nosso Ministério fará</button>
+                        <button 
+                          className={`btn ${preacherOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} 
+                          onClick={() => { setPreacherOption('igreja'); setPreacherId(''); setPreacherName(''); }}
+                        >Liderança da Igreja define</button>
+                      </div>
+                      {preacherOption === 'igreja' && (
+                        <div style={{ marginTop: 'var(--space-2)' }}>
+                          <PersonAutocomplete 
+                            onSelect={(person, name) => { setPreacherId(person?.id || ''); setPreacherName(person?.name || name); }} 
+                            placeholder="Nome (opcional)" 
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
                 
                 <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
                   <label className="form-label">🎵 Música / Louvor</label>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
-                    <button 
-                      className={`btn ${worshipOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} 
-                      onClick={() => { setWorshipOption('ministerio'); setWorshipLeaderId(''); setWorshipLeaderName(''); }}
-                    >Nosso Ministério fará</button>
-                    <button 
-                      className={`btn ${worshipOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} 
-                      onClick={() => { setWorshipOption('igreja'); setWorshipLeaderId(''); setWorshipLeaderName(''); }}
-                    >Equipe de Música Oficial</button>
-                  </div>
-                  {worshipOption === 'igreja' && (
-                    <div style={{ marginTop: 'var(--space-2)' }}>
-                      <PersonAutocomplete 
-                        onSelect={(person, name) => { setWorshipLeaderId(person?.id || ''); setWorshipLeaderName(person?.name || name); }} 
-                        placeholder="Nome (opcional)" 
-                      />
+                  {draftRoles.worship ? (
+                    <div style={{ padding: 'var(--space-3)', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--primary)' }}>✓ Definido na Escala:</span> {worshipLeaderName}
                     </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
+                        <button 
+                          className={`btn ${worshipOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} 
+                          onClick={() => { setWorshipOption('ministerio'); setWorshipLeaderId(''); setWorshipLeaderName(''); }}
+                        >Nosso Ministério fará</button>
+                        <button 
+                          className={`btn ${worshipOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} 
+                          onClick={() => { setWorshipOption('igreja'); setWorshipLeaderId(''); setWorshipLeaderName(''); }}
+                        >Equipe de Música Oficial</button>
+                      </div>
+                      {worshipOption === 'igreja' && (
+                        <div style={{ marginTop: 'var(--space-2)' }}>
+                          <PersonAutocomplete 
+                            onSelect={(person, name) => { setWorshipLeaderId(person?.id || ''); setWorshipLeaderName(person?.name || name); }} 
+                            placeholder="Nome (opcional)" 
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
                 
                 <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
                   <label className="form-label">💰 Dízimos e Ofertas</label>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
-                    <button 
-                      className={`btn ${ofertasOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} 
-                      onClick={() => { setOfertasOption('ministerio'); setOfertasId(''); setOfertasName(''); }}
-                    >Nosso Ministério fará</button>
-                    <button 
-                      className={`btn ${ofertasOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} 
-                      onClick={() => { setOfertasOption('igreja'); setOfertasId(''); setOfertasName(''); }}
-                    >Liderança da Igreja define</button>
-                  </div>
-                  {ofertasOption === 'igreja' && (
-                    <div style={{ marginTop: 'var(--space-2)' }}>
-                      <PersonAutocomplete 
-                        onSelect={(person, name) => { setOfertasId(person?.id || ''); setOfertasName(person?.name || name); }} 
-                        placeholder="Nome (opcional)" 
-                      />
+                  {draftRoles.ofertas ? (
+                    <div style={{ padding: 'var(--space-3)', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--primary)' }}>✓ Definido na Escala:</span> {ofertasName}
                     </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
+                        <button 
+                          className={`btn ${ofertasOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} 
+                          onClick={() => { setOfertasOption('ministerio'); setOfertasId(''); setOfertasName(''); }}
+                        >Nosso Ministério fará</button>
+                        <button 
+                          className={`btn ${ofertasOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} 
+                          onClick={() => { setOfertasOption('igreja'); setOfertasId(''); setOfertasName(''); }}
+                        >Liderança da Igreja define</button>
+                      </div>
+                      {ofertasOption === 'igreja' && (
+                        <div style={{ marginTop: 'var(--space-2)' }}>
+                          <PersonAutocomplete 
+                            onSelect={(person, name) => { setOfertasId(person?.id || ''); setOfertasName(person?.name || name); }} 
+                            placeholder="Nome (opcional)" 
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
                 
                 <div className="form-group" style={{ marginBottom: 'var(--space-6)' }}>
                   <label className="form-label">🧸 História das Crianças</label>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
-                    <button 
-                      className={`btn ${historiaOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} 
-                      onClick={() => { setHistoriaOption('ministerio'); setHistoriaId(''); setHistoriaName(''); }}
-                    >Nosso Ministério fará</button>
-                    <button 
-                      className={`btn ${historiaOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} 
-                      onClick={() => { setHistoriaOption('igreja'); setHistoriaId(''); setHistoriaName(''); }}
-                    >Liderança da Igreja define</button>
-                  </div>
-                  {historiaOption === 'igreja' && (
-                    <div style={{ marginTop: 'var(--space-2)' }}>
-                      <PersonAutocomplete 
-                        onSelect={(person, name) => { setHistoriaId(person?.id || ''); setHistoriaName(person?.name || name); }} 
-                        placeholder="Nome (opcional)" 
-                      />
+                  {draftRoles.historia ? (
+                    <div style={{ padding: 'var(--space-3)', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--primary)' }}>✓ Definido na Escala:</span> {historiaName}
                     </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', flexWrap: 'wrap' }}>
+                        <button 
+                          className={`btn ${historiaOption === 'ministerio' ? 'btn-primary' : 'btn-secondary'}`} 
+                          onClick={() => { setHistoriaOption('ministerio'); setHistoriaId(''); setHistoriaName(''); }}
+                        >Nosso Ministério fará</button>
+                        <button 
+                          className={`btn ${historiaOption === 'igreja' ? 'btn-primary' : 'btn-secondary'}`} 
+                          onClick={() => { setHistoriaOption('igreja'); setHistoriaId(''); setHistoriaName(''); }}
+                        >Liderança da Igreja define</button>
+                      </div>
+                      {historiaOption === 'igreja' && (
+                        <div style={{ marginTop: 'var(--space-2)' }}>
+                          <PersonAutocomplete 
+                            onSelect={(person, name) => { setHistoriaId(person?.id || ''); setHistoriaName(person?.name || name); }} 
+                            placeholder="Nome (opcional)" 
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -652,16 +949,17 @@ export default function PublicAgendarWizard() {
                 <p className="wizard-step-subtitle">Quem está solicitando este agendamento?</p>
                 <div className="form-group">
                   <label className="form-label">Seu Nome / Cargo *</label>
-                  <select className="form-input" value={solicitanteId} onChange={e => {
-                    setSolicitanteId(e.target.value);
-                    if (e.target.value !== 'outro') setSolicitante('');
-                  }}>
-                    <option value="">Selecione quem você é...</option>
-                    {people.map(p => <option key={p.id} value={p.id}>{p.name} {p.tags ? `(${p.tags})` : ''}</option>)}
-                    <option value="outro">Outro (Não estou na lista)</option>
-                  </select>
+                  <PersonSelect
+                    value={solicitanteId}
+                    onChange={(val, person) => {
+                      setSolicitanteId(val || '');
+                      setSolicitante(person?.name || '');
+                    }}
+                    placeholder="Selecione ou busque quem você é..."
+                    ministryId={ministryId}
+                  />
                 </div>
-                {solicitanteId === 'outro' && (
+                {solicitanteId && !people.find(p => p.id === solicitanteId) && (
                   <div className="form-group" style={{ marginTop: 'var(--space-4)' }}>
                     <label className="form-label">Digite seu nome completo *</label>
                     <input type="text" className="form-input" value={solicitante} onChange={e => setSolicitante(e.target.value)} placeholder="Ex: Irmã Maria (Diaconato)" autoFocus />

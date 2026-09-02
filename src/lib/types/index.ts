@@ -133,7 +133,7 @@ export interface UserAppRole {
 
 // ---- Events ----
 
-export type EventStatus = 'scheduled' | 'confirmed' | 'cancelled' | 'completed';
+export type EventStatus = 'scheduled' | 'confirmed' | 'cancelled' | 'completed' | 'draft';
 
 export interface ChurchEvent {
   id: string;
