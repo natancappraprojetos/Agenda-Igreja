@@ -144,7 +144,7 @@ export default function EquipePage() {
   };
 
   const handleRemoveMember = async (id: string, personName: string) => {
-    if (!confirm(`Deseja realmente remover ${personName} desta função?`)) return;
+    if (!confirm(`Deseja realmente remover ${personName} desta função?\n\nFique tranquilo: isso não apaga a pessoa do sistema, apenas a retira desta equipe.`)) return;
     try {
       const { error } = await supabase.from('person_roles').delete().eq('id', id);
       if (error) throw error;
@@ -156,7 +156,7 @@ export default function EquipePage() {
   };
 
   const handleRemoveMultiple = async (ids: string[], personName: string) => {
-    if (!confirm(`Deseja realmente remover ${personName} de todas as funções desta categoria?`)) return;
+    if (!confirm(`Deseja realmente remover ${personName} de todas as funções desta categoria?\n\nFique tranquilo: isso não apaga a pessoa do sistema, apenas a retira da equipe.`)) return;
     try {
       for (const id of ids) {
         await supabase.from('person_roles').delete().eq('id', id);
