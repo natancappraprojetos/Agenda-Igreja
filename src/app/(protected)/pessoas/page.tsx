@@ -309,14 +309,20 @@ export default function PessoasPage() {
                       )}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      <button 
-                        className="btn btn-icon" 
-                        style={{ padding: '6px', color: 'var(--danger)', opacity: 0.8 }}
-                        onClick={(e) => handleDelete(item.id, e)}
-                        title="Excluir"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      {(activeTab === 'Todos' || activeTab === 'Inativos') ? (
+                        <button 
+                          className="btn btn-icon" 
+                          style={{ padding: '6px', color: 'var(--danger)', opacity: 0.8 }}
+                          onClick={(e) => handleDelete(item.id, e)}
+                          title="Excluir pessoa permanentemente do sistema"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }} title="Para remover, clique no nome e edite as marcações.">
+                           Editar para remover
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
