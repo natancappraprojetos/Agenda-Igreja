@@ -706,7 +706,13 @@ export default function PublicAgendarWizard() {
                       setLocationId(l.id);
                       setTimeout(() => setStep(4), 200);
                     }}>
-                      <span className="wizard-option-icon">📍</span>
+                      {l.image_url ? (
+                        <div style={{ width: 48, height: 48, borderRadius: '50%', overflow: 'hidden', marginBottom: '8px', border: '2px solid var(--border)', flexShrink: 0 }}>
+                          <img src={l.image_url} alt={l.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                      ) : (
+                        <span className="wizard-option-icon">📍</span>
+                      )}
                       <span className="wizard-option-label">{l.name}</span>
                     </div>
                   ))}
