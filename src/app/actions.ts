@@ -72,7 +72,7 @@ export async function saveLiturgyItemsAdmin(lid: string, items: any[]) {
   return data;
 }
 export async function getLiturgyItemPublic(itemId: string) {
-  const supabase = getAdminClient();
+  const supabase = supabaseAdmin;
   const { data, error } = await supabase
     .from('liturgy_items')
     .select('*, liturgy:liturgies(event_id, events(title, date))')
@@ -87,7 +87,7 @@ export async function getLiturgyItemPublic(itemId: string) {
 }
 
 export async function updateLiturgyItemPublic(itemId: string, updateData: any) {
-  const supabase = getAdminClient();
+  const supabase = supabaseAdmin;
   const { error } = await supabase
     .from('liturgy_items')
     .update(updateData)

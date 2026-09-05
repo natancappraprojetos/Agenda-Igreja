@@ -135,7 +135,7 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
       const dateStr = format(newDraft.date, 'yyyy-MM-dd');
       
       let finalTime = newDraft.time;
-      let finalParentId = null;
+      let finalParentId: string | null = null;
 
       const eventType = eventTypes.find(t => t.id === newDraft.typeId);
       const isSubEvent = eventType && !eventType.name.toLowerCase().includes('culto');
@@ -370,10 +370,10 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
           </div>
           
           {/* Sub-events (e.g. Batismo) */}
-          {events.filter(e => e.parent_event_id === selectedEvent.id).length > 0 && (
-            <div style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-3)', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-               <h4 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>Eventos Vinculados</h4>
-               {events.filter(e => e.parent_event_id === selectedEvent.id).map(sub => (
+          {events.filter(e => (e as any).parent_event_id === selectedEvent.id).length > 0 && (
+            <div className="subevents-list" style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', backgroundColor: 'var(--surface-hover)', borderRadius: 'var(--radius-md)' }}>
+              <h4 style={{ fontSize: '0.9rem', marginBottom: 'var(--space-2)' }}>Eventos Vinculados</h4>
+              {events.filter(e => (e as any).parent_event_id === selectedEvent.id).map(sub => (
                  <div key={sub.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) 0', borderBottom: '1px dashed var(--border-color)' }}>
                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                      <span>{sub.event_type?.icon || '🔹'}</span>

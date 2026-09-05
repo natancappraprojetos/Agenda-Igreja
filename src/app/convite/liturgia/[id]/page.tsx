@@ -125,7 +125,7 @@ export default function LiturgyInvitePage() {
               <label className="form-label">Responsável / Líder</label>
               <PersonSelect 
                 value={responsibleId} 
-                onChange={(val) => setResponsibleId(val)} 
+                onChange={(val) => setResponsibleId(val || '')} 
                 placeholder="Busque pelo nome..." 
               />
             </div>

@@ -163,7 +163,8 @@ export default function PublicAgendarWizard() {
          } else if (draftEvent.preacher_id) {
             setPreacherOption('igreja');
             setPreacherId(draftEvent.preacher_id);
-            setPreacherName(draftEvent.preacher?.name || '');
+            const preacherObj: any = draftEvent.preacher;
+            setPreacherName(preacherObj?.name || preacherObj?.[0]?.name || '');
             newDraftRoles.preacher = true;
          }
 
@@ -177,7 +178,8 @@ export default function PublicAgendarWizard() {
          } else if (draftEvent.worship_leader_id) {
             setWorshipOption('igreja');
             setWorshipLeaderId(draftEvent.worship_leader_id);
-            setWorshipLeaderName(draftEvent.worship?.name || '');
+            const worshipObj: any = draftEvent.worship;
+            setWorshipLeaderName(worshipObj?.name || worshipObj?.[0]?.name || '');
             newDraftRoles.worship = true;
          }
          
@@ -201,13 +203,15 @@ export default function PublicAgendarWizard() {
          if (draftEvent.preacher_id) {
             setPreacherOption('igreja');
             setPreacherId(draftEvent.preacher_id);
-            setPreacherName(draftEvent.preacher?.name || '');
+            const preacherObj: any = draftEvent.preacher;
+            setPreacherName(preacherObj?.name || preacherObj?.[0]?.name || '');
             newDraftRoles.preacher = true;
          }
          if (draftEvent.worship_leader_id) {
             setWorshipOption('igreja');
             setWorshipLeaderId(draftEvent.worship_leader_id);
-            setWorshipLeaderName(draftEvent.worship?.name || '');
+            const worshipObj: any = draftEvent.worship;
+            setWorshipLeaderName(worshipObj?.name || worshipObj?.[0]?.name || '');
             newDraftRoles.worship = true;
          }
       }
@@ -706,9 +710,9 @@ export default function PublicAgendarWizard() {
                       setLocationId(l.id);
                       setTimeout(() => setStep(4), 200);
                     }}>
-                      {l.image_url ? (
+                      {(l as any).image_url ? (
                         <div style={{ width: 64, height: 64, borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: '8px', border: '2px solid var(--border)', flexShrink: 0 }}>
-                          <img src={l.image_url} alt={l.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={(l as any).image_url} alt={l.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
                       ) : (
                         <span className="wizard-option-icon">📍</span>

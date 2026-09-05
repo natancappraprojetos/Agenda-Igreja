@@ -107,7 +107,7 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
       }
       
       const { data } = await query;
-      let fetchedPeople = (data as Person[]) || [];
+      let fetchedPeople = (data as unknown as Person[]) || [];
 
       // Always fetch the selected person if they are not in the list (e.g. inactive visitor)
       if (value && !fetchedPeople.find(p => p.id === value)) {
@@ -117,7 +117,7 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
           person_ministries(ministry:ministries(name))
         `).eq('id', value).maybeSingle();
         if (valData) {
-          fetchedPeople = [...fetchedPeople, valData as Person];
+          fetchedPeople = [...fetchedPeople, valData as unknown as Person];
         }
       }
       
