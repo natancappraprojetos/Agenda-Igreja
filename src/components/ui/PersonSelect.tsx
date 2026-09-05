@@ -66,11 +66,11 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
         if (minData) {
           const mName = minData.name.toLowerCase();
           let searchWords = [];
-          if (mName.includes('ancionato')) searchWords.push('anciã', 'ancião');
+          if (mName.includes('anci')) searchWords.push('anciã', 'ancião', 'anciãos', 'ancionato');
           else if (mName.includes('desbravador')) searchWords.push('desbravador', 'diretor');
-          else if (mName.includes('jovem')) searchWords.push('jovem', 'diretor');
+          else if (mName.includes('jovem') || mName.includes('jovens')) searchWords.push('jovem', 'diretor');
           else if (mName.includes('música') || mName.includes('louvor')) searchWords.push('cantor', 'música', 'louvor', 'sonoplasta');
-          else if (mName.includes('diaconato')) searchWords.push('diácono', 'diaconisa');
+          else if (mName.includes('diacon')) searchWords.push('diácono', 'diaconisa');
           else if (mName.includes('sabatina')) searchWords.push('professor', 'sabatina');
           else searchWords.push(mName); // fallback to exact name part
 
