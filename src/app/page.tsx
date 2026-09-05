@@ -126,7 +126,8 @@ export default function AgendaPage() {
           preacher:people!events_preacher_id_fkey(*),
           worship_leader:people!events_worship_leader_id_fkey(*),
           sound_person:people!events_sound_person_id_fkey(*),
-          responsible_person:people!events_responsible_person_id_fkey(*)
+          responsible_person:people!events_responsible_person_id_fkey(*),
+          participants:event_participants(role:roles(name), person:people(name, id))
         `)
         .gte('date', startDate)
         .lte('date', endDate)
@@ -212,17 +213,22 @@ export default function AgendaPage() {
           </div>
           {isLeadership && (
             <div className="event-card-status">
-              {event.preacher ? (
-                <span className="badge badge-success">✅ Pregador</span>
-              ) : event.event_type?.name === 'Culto' ? (
-                <span className="badge badge-danger">❌ Pregador</span>
-              ) : null}
-              {event.needs_sound && !event.sound_person && (
-                <span className="badge badge-warning">⚠️ Sonoplastia</span>
-              )}
-              {event.needs_sound && event.sound_person && (
-                <span className="badge badge-success">✅ Sonoplastia</span>
-              )}
+              {(() => {
+                const hasPreacherParticipant = event.participants?.some(p => p.role?.name?.toLowerCase().includes('pregador'));
+                return (event.preacher || hasPreacherParticipant) ? (
+                  <span className="badge badge-success">✅ Pregador</span>
+                ) : event.event_type?.name === 'Culto' ? (
+                  <span className="badge badge-danger">❌ Pregador</span>
+                ) : null;
+              })()}
+              {(() => {
+                const hasSoundParticipant = event.participants?.some(p => p.role?.name?.toLowerCase().includes('sonoplasta'));
+                return event.needs_sound && !(event.sound_person || hasSoundParticipant) ? (
+                  <span className="badge badge-warning">⚠️ Sonoplastia</span>
+                ) : event.needs_sound && (event.sound_person || hasSoundParticipant) ? (
+                  <span className="badge badge-success">✅ Sonoplastia</span>
+                ) : null;
+              })()}
             </div>
           )}
         </div>

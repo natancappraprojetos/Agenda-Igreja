@@ -236,9 +236,9 @@ export default function LiturgyBuilderPage() {
         { emoji: '🎤', title: 'Mensagem Musical', duration: 5, person: findPerson(['Solo']) || ev.worship_leader },
         { emoji: '🙏', title: 'Oração Inicial (de joelhos)', duration: 5, person: null },
         { emoji: '🎼', title: 'Louvor Especial', duration: 5, person: findPerson(['Solo']) || ev.worship_leader },
-        { emoji: '📖', title: 'Sermão', duration: 35, person: ev.preacher },
+        { emoji: '📖', title: 'Sermão', duration: 35, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
         { emoji: '🎼', title: 'Louvor Especial', duration: 5, person: findPerson(['Solo']) || ev.worship_leader },
-        { emoji: '🙏', title: 'Oração Final', duration: 3, person: ev.preacher },
+        { emoji: '🙏', title: 'Oração Final', duration: 3, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
       ];
     } else if (isQuarta) {
       initialItems = [
@@ -247,9 +247,9 @@ export default function LiturgyBuilderPage() {
         { emoji: '🙏', title: 'Pedidos e agradecimentos', duration: 15, person: null },
         { emoji: '💰', title: 'Momento Fidelidade / Ofertas', duration: 5, person: findPerson(['Oferta']) },
         { emoji: '🎼', title: 'Louvor Inicial', duration: 4, person: ev.worship_leader },
-        { emoji: '📖', title: 'Pregação', duration: 30, person: ev.preacher },
+        { emoji: '📖', title: 'Pregação', duration: 30, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
         { emoji: '🎼', title: 'Louvor final', duration: 3, person: ev.worship_leader },
-        { emoji: '🙏', title: 'Oração Final', duration: 3, person: ev.preacher },
+        { emoji: '🙏', title: 'Oração Final', duration: 3, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
       ];
     } else {
       // Domingo ou Padrão
@@ -258,9 +258,9 @@ export default function LiturgyBuilderPage() {
         { emoji: '🙏', title: 'Oração Inicial', duration: 5, person: null },
         { emoji: '💰', title: 'Momento Fidelidade / Ofertas', duration: 5, person: findPerson(['Oferta']) },
         { emoji: '🎼', title: 'Louvor Inicial', duration: 5, person: ev.worship_leader },
-        { emoji: '📖', title: 'Pregação', duration: 30, person: ev.preacher },
+        { emoji: '📖', title: 'Pregação', duration: 30, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
         { emoji: '🎼', title: 'Louvor final', duration: 5, person: ev.worship_leader },
-        { emoji: '🙏', title: 'Oração Final', duration: 3, person: ev.preacher },
+        { emoji: '🙏', title: 'Oração Final', duration: 3, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
       ];
     }
 
