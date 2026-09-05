@@ -373,8 +373,8 @@ export default function AgendaPage() {
         alignItems: 'center'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <div className="login-logo" style={{ overflow: 'hidden', width: 40, height: 40, borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--primary)' }}>
-            <img src="/icon.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div className="login-logo" style={{ overflow: 'hidden', width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src="/logo-azul.jpg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <h1 className="hide-on-mobile" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
             Central Santo Afonso
@@ -482,69 +482,49 @@ export default function AgendaPage() {
                 <hr style={{ border: 'none', borderTop: '1px solid var(--border-light)', margin: 'var(--space-4) 0' }} />
 
                 {(() => {
-                  const getPersonId = (colVal: any, roleNames: string[]) => {
-                    if (colVal) return colVal;
+                  const isCulto = selectedEvent.event_type?.name?.toLowerCase().includes('culto');
+                  const getPersonInfo = (colValId: any, colValPerson: any, roleNames: string[]) => {
+                    if (colValId) return { id: colValId, name: colValPerson?.name };
                     const p = eventParticipants.find(p => roleNames.some(rn => p.role?.name?.toLowerCase().includes(rn.toLowerCase())));
-                    return p ? p.person_id : '';
+                    return p ? { id: p.person_id, name: p.person?.name } : { id: '', name: '' };
                   };
                   
-                  const resolvedSoundPersonId = getPersonId(selectedEvent.sound_person_id, ['sonoplasta', 'sonoplastia']);
-                  const resolvedPreacherId = getPersonId(selectedEvent.preacher_id, ['pregador']);
-                  const resolvedWorshipId = getPersonId(selectedEvent.worship_leader_id, ['líder de louvor', 'música']);
-                  const resolvedResponsibleId = getPersonId(selectedEvent.responsible_person_id, ['responsável']);
+                  const soundPerson = getPersonInfo(selectedEvent.sound_person_id, selectedEvent.sound_person, ['sonoplasta', 'sonoplastia']);
+                  const preacher = getPersonInfo(selectedEvent.preacher_id, selectedEvent.preacher, ['pregador']);
+                  const worship = getPersonInfo(selectedEvent.worship_leader_id, selectedEvent.worship_leader, ['líder de louvor', 'música', 'louvor']);
+                  const responsible = getPersonInfo(selectedEvent.responsible_person_id, selectedEvent.responsible_person, ['responsável']);
+
+                  const renderField = (label: string, personInfo: { id: string, name: string }, fieldId: string) => (
+                    <div className="review-section" style={{ overflow: 'visible' }}>
+                      <div className="review-label">{label}</div>
+                      <div className="review-value">
+                        {user ? (
+                          <PersonSelect 
+                            value={personInfo.id} 
+                            onChange={(val) => handleUpdateRole(selectedEvent.id, fieldId, val)} 
+                            placeholder="Definir..." 
+                          />
+                        ) : (
+                          <span style={{ fontWeight: 500, color: personInfo.name ? 'inherit' : 'var(--text-tertiary)' }}>
+                            {personInfo.name || 'A Definir...'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
 
                   return (
                     <div className="review-grid">
-                      <div className="review-section" style={{ overflow: 'visible' }}>
-                        <div className="review-label">🔊 Sonoplastia</div>
-                        <div className="review-value">
-                            <PersonSelect 
-                              value={resolvedSoundPersonId} 
-                              onChange={(val) => handleUpdateRole(selectedEvent.id, 'sound_person_id', val)} 
-                              placeholder="Definir..." 
-                            />
-                        </div>
-                      </div>
-
-                      <div className="review-section" style={{ overflow: 'visible' }}>
-                        <div className="review-label">🎤 Pregador</div>
-                        <div className="review-value">
-                            <PersonSelect 
-                              value={resolvedPreacherId} 
-                              onChange={(val) => handleUpdateRole(selectedEvent.id, 'preacher_id', val)} 
-                              placeholder="Definir..." 
-                            />
-                        </div>
-                      </div>
-
-                      <div className="review-section" style={{ overflow: 'visible' }}>
-                        <div className="review-label">🎵 Louvor</div>
-                        <div className="review-value">
-                            <PersonSelect 
-                              value={resolvedWorshipId} 
-                              onChange={(val) => handleUpdateRole(selectedEvent.id, 'worship_leader_id', val)} 
-                              placeholder="Definir..." 
-                            />
-                        </div>
-                      </div>
-
-                      <div className="review-section" style={{ overflow: 'visible' }}>
-                        <div className="review-label">👤 Responsável</div>
-                        <div className="review-value">
-                            <PersonSelect 
-                              value={resolvedResponsibleId} 
-                              onChange={(val) => handleUpdateRole(selectedEvent.id, 'responsible_person_id', val)} 
-                              placeholder="Definir..." 
-                            />
-                        </div>
-                      </div>
+                      {(isCulto || soundPerson.id) && renderField('🔊 Sonoplastia', soundPerson, 'sound_person_id')}
+                      {(isCulto || preacher.id) && renderField('🎤 Pregador', preacher, 'preacher_id')}
+                      {(isCulto || worship.id) && renderField('🎵 Louvor', worship, 'worship_leader_id')}
+                      {renderField('👤 Responsável', responsible, 'responsible_person_id')}
                     </div>
                   );
                 })()}
 
                 {/* FUNÇÕES EXTRAS (LITURGIA/ESCALAS) */}
                 {(() => {
-                  if (!user) return null;
                   
                   const isSabado = selectedEvent.title.toLowerCase().includes('sáb') || selectedEvent.title.toLowerCase().includes('sabado');
                   const baseVirtualRoles = isSabado ? ['Escola Sabatina', 'História das Crianças', 'Ofertas', 'Anúncios'] : [];
@@ -567,6 +547,24 @@ export default function AgendaPage() {
                          displayedRoles.push({ roleName: ep.role?.name, roleId: ep.role_id, personId: ep.person_id, personName: ep.person?.name, epId: ep.id });
                      }
                   });
+                  
+                  // If not authenticated, only show the non-empty virtual roles or standard roles as text, don't allow edits
+                  if (!user) {
+                    const populatedRoles = displayedRoles.filter(dr => dr.personName);
+                    if (populatedRoles.length === 0) return null;
+                    return (
+                      <div className="review-grid" style={{ marginTop: 'var(--space-2)' }}>
+                        {populatedRoles.map((dr, idx) => (
+                          <div key={idx} className="review-section">
+                            <div className="review-label">✨ {dr.roleName}</div>
+                            <div className="review-value">
+                              <span style={{ fontWeight: 500 }}>{dr.personName}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
 
                   return (
                     <>
@@ -655,12 +653,14 @@ export default function AgendaPage() {
               </div>
               {user && (
                 <div className="modal-footer">
-                  <Link
-                    href={`/eventos/${selectedEvent.id}/liturgia`}
-                    className="btn btn-secondary"
-                  >
-                    📜 Liturgia
-                  </Link>
+                  {selectedEvent.event_type?.name?.toLowerCase().includes('culto') && (
+                    <Link
+                      href={`/eventos/${selectedEvent.id}/liturgia`}
+                      className="btn btn-secondary"
+                    >
+                      📜 Liturgia
+                    </Link>
+                  )}
                   <Link
                     href={`/eventos/${selectedEvent.id}`}
                     className="btn btn-primary"

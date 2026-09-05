@@ -693,7 +693,7 @@ export default function PublicAgendarWizard() {
             {step === 3 && (
               <div className="wizard-step">
                 <h2 className="wizard-step-title">Onde será?</h2>
-                <div className="wizard-options list-mode">
+                <div className="wizard-options">
                   <div className={`wizard-option ${locationId === '' ? 'selected' : ''}`} onClick={() => {
                     setLocationId('');
                     setTimeout(() => setStep(4), 200);
@@ -707,7 +707,7 @@ export default function PublicAgendarWizard() {
                       setTimeout(() => setStep(4), 200);
                     }}>
                       {l.image_url ? (
-                        <div style={{ width: 48, height: 48, borderRadius: '50%', overflow: 'hidden', marginBottom: '8px', border: '2px solid var(--border)', flexShrink: 0 }}>
+                        <div style={{ width: 64, height: 64, borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: '8px', border: '2px solid var(--border)', flexShrink: 0 }}>
                           <img src={l.image_url} alt={l.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
                       ) : (
@@ -954,7 +954,7 @@ export default function PublicAgendarWizard() {
                 <h2 className="wizard-step-title">Identificação</h2>
                 <p className="wizard-step-subtitle">Quem está solicitando este agendamento?</p>
                 <div className="form-group">
-                  <label className="form-label">Seu Nome / Cargo *</label>
+                  <label className="form-label">Seu Nome *</label>
                   <PersonSelect
                     value={solicitanteId}
                     onChange={(val, person) => {

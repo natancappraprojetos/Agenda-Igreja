@@ -45,7 +45,9 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-header">
-          <div className="login-logo">⛪</div>
+          <div className="login-logo" style={{ overflow: 'hidden', width: 64, height: 64, borderRadius: '50%', margin: '0 auto var(--space-4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src="/logo-azul.jpg" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          </div>
           <h1 className="login-title">Igreja Central de Santo Afonso</h1>
           <p className="login-subtitle">
             Faça login para acessar o sistema
