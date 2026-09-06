@@ -37,7 +37,7 @@ const adminItems = [
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { person, roles, isAdmin, isLeadership, signOut } = useAuth();
+  const { person, roles, isAdmin, isLeadership, isLoading, signOut } = useAuth();
   const notificationsData = useUnreadNotificationsCount();
   
   const isStrictLeader = roles.some(r => ['musica', 'sonoplastia', 'diacono'].includes(r));
@@ -79,39 +79,46 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         <nav className="sidebar-nav">
-          {/* Agenda Geral e Novo Evento são visíveis para todos */}
-          <Link
-            href="/"
-            className={`sidebar-link ${isActive('/') ? 'active' : ''}`}
-            onClick={onClose}
-          >
-            <span className="sidebar-link-icon"><CalendarDays size={20} /></span>
-            Agenda Geral
-          </Link>
+          {isLoading ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+              <div className="spinner" style={{ width: '24px', height: '24px', margin: '0 auto 10px', border: '3px solid rgba(255,255,255,0.1)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+              <small>Carregando perfil...</small>
+            </div>
+          ) : (
+            <>
+              {/* Agenda Geral e Novo Evento são visíveis para todos */}
+              <Link
+                href="/"
+                className={`sidebar-link ${isActive('/') ? 'active' : ''}`}
+                onClick={onClose}
+              >
+                <span className="sidebar-link-icon"><CalendarDays size={20} /></span>
+                Agenda Geral
+              </Link>
 
-          <Link
-            href="/eventos/novo"
-            className={`sidebar-link ${isActive('/eventos/novo') ? 'active' : ''}`}
-            onClick={onClose}
-          >
-            <span className="sidebar-link-icon"><PlusCircle size={20} /></span>
-            Novo Evento
-          </Link>
+              <Link
+                href="/eventos/novo"
+                className={`sidebar-link ${isActive('/eventos/novo') ? 'active' : ''}`}
+                onClick={onClose}
+              >
+                <span className="sidebar-link-icon"><PlusCircle size={20} /></span>
+                Novo Evento
+              </Link>
 
-          {/* Pendências e Visão Geral apenas para Admin */}
-          {(isAdmin) && navItems.filter(item => item.href !== '/' && item.href !== '/eventos/novo').map(item => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`sidebar-link ${isActive(item.href) ? 'active' : ''}`}
-              onClick={onClose}
-            >
-              <span className="sidebar-link-icon">{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
+              {/* Pendências e Visão Geral apenas para Admin */}
+              {(isAdmin) && navItems.filter(item => item.href !== '/' && item.href !== '/eventos/novo').map(item => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`sidebar-link ${isActive(item.href) ? 'active' : ''}`}
+                  onClick={onClose}
+                >
+                  <span className="sidebar-link-icon">{item.icon}</span>
+                  {item.label}
+                </Link>
+              ))}
 
-          {/* Seção Cadastros */}
+              {/* Seção Cadastros */}
           {(true) && (
             <>
               <div className="sidebar-section">
@@ -157,7 +164,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               })}
             </>
           )}
-
           <Link
             href="/notificacoes"
             className={`sidebar-link ${isActive('/notificacoes') ? 'active' : ''}`}
@@ -210,6 +216,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </Link>
               ))}
             </>
+          )}
+          </>
           )}
         </nav>
 
