@@ -1,5 +1,7 @@
--- Fix event_pendencies to properly ignore Preacher for non-cults, check liturgy_items, and restore pendency_status
-CREATE OR REPLACE VIEW event_pendencies AS
+-- Fix event_pendencies - drop and recreate to avoid column order conflicts
+DROP VIEW IF EXISTS event_pendencies;
+
+CREATE VIEW event_pendencies AS
 SELECT 
     e.id AS event_id,
     e.title,

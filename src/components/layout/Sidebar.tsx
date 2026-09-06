@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useUnreadNotificationsCount } from '@/lib/hooks/useUnreadNotificationsCount';
 import { 
   CalendarDays, LayoutDashboard, PlusCircle, AlertTriangle, 
   Users, Landmark, MapPin, Bell, Tags, ClipboardList, 
@@ -37,6 +38,7 @@ const adminItems = [
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { person, roles, isAdmin, isLeadership, signOut } = useAuth();
+  const notificationsData = useUnreadNotificationsCount();
   
   const isStrictLeader = roles.some(r => ['musica', 'sonoplastia', 'diacono'].includes(r));
   const hasTeam = roles.some(r => ['musica', 'sonoplastia', 'diacono', 'anciao'].includes(r));
@@ -96,8 +98,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             Novo Evento
           </Link>
 
-          {/* Pendências e Visão Geral apenas para Admin e Liderança Estrita (música, som, diácono) */}
-          {(isAdmin || isStrictLeader) && navItems.filter(item => item.href !== '/' && item.href !== '/eventos/novo').map(item => (
+          {/* Pendências e Visão Geral apenas para Admin */}
+          {(isAdmin) && navItems.filter(item => item.href !== '/' && item.href !== '/eventos/novo').map(item => (
             <Link
               key={item.href}
               href={item.href}
@@ -161,7 +163,31 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             className={`sidebar-link ${isActive('/notificacoes') ? 'active' : ''}`}
             onClick={onClose}
           >
-            <span className="sidebar-link-icon"><Bell size={20} /></span>
+            <span className="sidebar-link-icon" style={{ position: 'relative' }}>
+              <Bell size={20} />
+              {notificationsData.count > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  backgroundColor: 'var(--danger)',
+                  color: 'white',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px solid var(--sidebar-bg)',
+                  animation: notificationsData.hasUrgent ? 'pulse 1.5s infinite' : 'none',
+                  boxShadow: notificationsData.hasUrgent ? '0 0 8px var(--danger)' : 'none'
+                }}>
+                  {notificationsData.count > 9 ? '9+' : notificationsData.count}
+                </span>
+              )}
+            </span>
             Notificações
           </Link>
 
