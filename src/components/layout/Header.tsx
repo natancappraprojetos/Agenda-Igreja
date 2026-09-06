@@ -7,10 +7,20 @@ interface HeaderProps {
 }
 
 export default function Header({ title, onMenuToggle, children }: HeaderProps) {
+  const handleToggle = () => {
+    if (onMenuToggle) {
+      onMenuToggle();
+    }
+    // Dispatch a global event so layout.tsx can open the sidebar
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('toggleSidebar'));
+    }
+  };
+
   return (
     <header className="header">
       <div className="header-left">
-        <button className="header-menu-btn" onClick={onMenuToggle} aria-label="Menu">
+        <button className="header-menu-btn" onClick={handleToggle} aria-label="Menu">
           ☰
         </button>
         <h1 className="header-title">{title}</h1>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { ToastProvider } from '@/lib/hooks/useToast';
 import Sidebar from '@/components/layout/Sidebar';
@@ -12,6 +12,12 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const handleToggle = () => setSidebarOpen(prev => !prev);
+    window.addEventListener('toggleSidebar', handleToggle);
+    return () => window.removeEventListener('toggleSidebar', handleToggle);
+  }, []);
 
   return (
         <div className="app-layout">
