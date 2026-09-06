@@ -14,7 +14,7 @@ const mobileNavItems = [
 export default function MobileNav() {
   const pathname = usePathname();
   const { roles } = useAuth();
-  const isAdmin = roles.includes('admin') || roles.includes('diretoria');
+  const isAdmin = roles.includes('admin');
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
