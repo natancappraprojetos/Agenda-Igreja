@@ -22,7 +22,7 @@ SELECT
         OR EXISTS(
             SELECT 1 FROM liturgy_items li
             JOIN liturgies l ON l.id = li.liturgy_id
-            WHERE l.event_id = e.id AND li.person_id IS NOT NULL AND (li.title ILIKE '%sermão%' OR li.title ILIKE '%pregação%')
+            WHERE l.event_id = e.id AND li.responsible_person_id IS NOT NULL AND (li.title ILIKE '%sermão%' OR li.title ILIKE '%pregação%')
         )
     ) AS has_preacher,
     
@@ -41,7 +41,7 @@ SELECT
         OR EXISTS(
             SELECT 1 FROM liturgy_items li
             JOIN liturgies l ON l.id = li.liturgy_id
-            WHERE l.event_id = e.id AND li.person_id IS NOT NULL AND (li.title ILIKE '%louvor%' OR li.title ILIKE '%música%' OR li.title ILIKE '%cântico%')
+            WHERE l.event_id = e.id AND li.responsible_person_id IS NOT NULL AND (li.title ILIKE '%louvor%' OR li.title ILIKE '%música%' OR li.title ILIKE '%cântico%')
         )
     ) AS has_worship_leader,
     
@@ -80,13 +80,13 @@ SELECT
             (
                 NOT et.name ILIKE '%culto%' OR e.preacher_id IS NOT NULL 
                 OR EXISTS(SELECT 1 FROM event_participants ep JOIN roles r ON r.id = ep.role_id WHERE ep.event_id = e.id AND r.name ILIKE '%Pregador%')
-                OR EXISTS(SELECT 1 FROM liturgy_items li JOIN liturgies l ON l.id = li.liturgy_id WHERE l.event_id = e.id AND li.person_id IS NOT NULL AND (li.title ILIKE '%sermão%' OR li.title ILIKE '%pregação%'))
+                OR EXISTS(SELECT 1 FROM liturgy_items li JOIN liturgies l ON l.id = li.liturgy_id WHERE l.event_id = e.id AND li.responsible_person_id IS NOT NULL AND (li.title ILIKE '%sermão%' OR li.title ILIKE '%pregação%'))
             )
             AND (
                 (NOT e.needs_worship AND NOT EXISTS(SELECT 1 FROM event_needs en JOIN event_needs_types ent ON ent.id = en.need_type_id WHERE en.event_id = e.id AND (ent.name ILIKE '%Louvor%' OR ent.name ILIKE '%Música%')))
                 OR e.worship_leader_id IS NOT NULL
                 OR EXISTS(SELECT 1 FROM event_participants ep JOIN roles r ON r.id = ep.role_id WHERE ep.event_id = e.id AND r.category = 'musical')
-                OR EXISTS(SELECT 1 FROM liturgy_items li JOIN liturgies l ON l.id = li.liturgy_id WHERE l.event_id = e.id AND li.person_id IS NOT NULL AND (li.title ILIKE '%louvor%' OR li.title ILIKE '%música%' OR li.title ILIKE '%cântico%'))
+                OR EXISTS(SELECT 1 FROM liturgy_items li JOIN liturgies l ON l.id = li.liturgy_id WHERE l.event_id = e.id AND li.responsible_person_id IS NOT NULL AND (li.title ILIKE '%louvor%' OR li.title ILIKE '%música%' OR li.title ILIKE '%cântico%'))
             )
             AND (
                 (NOT e.needs_sound AND NOT EXISTS(SELECT 1 FROM event_needs en JOIN event_needs_types ent ON ent.id = en.need_type_id WHERE en.event_id = e.id AND ent.name ILIKE '%Sonoplastia%'))
