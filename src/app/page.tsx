@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useToast } from '@/lib/hooks/useToast';
 import Link from 'next/link';
-import type { ChurchEvent, CalendarView } from '@/lib/types';
+import type { ChurchEvent, CalendarView, AppRoleName } from '@/lib/types';
 import PersonSelect from '@/components/ui/PersonSelect';
 import {
   getMonthDays, getWeekDays, isToday, isSameDay,
