@@ -480,9 +480,11 @@ export default function AgendaPage() {
                               </div>
                               <div className="calendar-day-events">
                                 {cellEvents.length === 0 ? (
-                                  <div className="calendar-event-pill" style={{ background: '#e5e7eb', color: '#6b7280', padding: isTrimester ? '2px 4px' : '6px', textAlign: 'center', fontStyle: 'italic', fontSize: isTrimester ? '0.75rem' : '0.8rem', opacity: 0.7 }}>
-                                    A Definir
-                                  </div>
+                                  [0, 3, 6].includes(mainDay.getDay()) ? (
+                                    <div className="calendar-event-pill" style={{ background: '#e5e7eb', color: '#6b7280', padding: isTrimester ? '2px 4px' : '6px', textAlign: 'center', fontStyle: 'italic', fontSize: isTrimester ? '0.75rem' : '0.8rem', opacity: 0.7 }}>
+                                      A Definir
+                                    </div>
+                                  ) : null
                                 ) : (
                                   cellEvents.map(ev => {
                                      let text = ev.title;
