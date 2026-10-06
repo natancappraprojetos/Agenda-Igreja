@@ -429,7 +429,7 @@ export default function AgendaPage() {
       columns.push('Recolher Ofertas/Dízimos');
     }
 
-    const renderMinistryCalendarGrid = (monthDate: Date, isTrimester: boolean) => {
+    const renderMinistryCalendarGrid = (monthDate: Date, isTrimester: boolean, monthIndex: number = 0) => {
         const days = getMonthDays(monthDate.getFullYear(), monthDate.getMonth());
         const weekdays = isTrimester ? ['Domingo', 'Quarta', 'Sábado'] : ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -507,7 +507,7 @@ export default function AgendaPage() {
                                         key={ev.id}
                                         className="calendar-event-pill"
                                         style={{
-                                          background: ev.event_type?.color || 'var(--primary)',
+                                          background: isTrimester ? ['#4f46e5', '#3b82f6', '#0ea5e9'][monthIndex % 3] : (ev.event_type?.color || 'var(--primary)'),
                                           color: 'white',
                                           flexDirection: 'column',
                                           alignItems: 'flex-start',
@@ -559,7 +559,7 @@ export default function AgendaPage() {
                monthsToRender.push(new Date(currentDate.getFullYear(), quarterStartMonthIndex + i, 1));
            }
        }
-       return monthsToRender.map(m => renderMinistryCalendarGrid(m, printPeriod === 'trimestre'));
+       return monthsToRender.map((m, i) => renderMinistryCalendarGrid(m, printPeriod === 'trimestre', i));
     };
 
     return (

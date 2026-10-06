@@ -9,6 +9,7 @@ import { createLiturgyAdmin, saveLiturgyItemsAdmin } from '@/app/actions';
 import PersonSelect from '@/components/ui/PersonSelect';
 import { calculateLiturgyTimes, formatTime } from '@/lib/utils/liturgy-calculator';
 import { formatDateShort } from '@/lib/utils/dates';
+import html2canvas from 'html2canvas';
 
 interface LocalLiturgyItem {
   id?: string;
@@ -36,6 +37,7 @@ export default function LiturgyBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   
   const supabase = createClient();
   const { addToast } = useToast();
@@ -624,6 +626,27 @@ export default function LiturgyBuilderPage() {
     setTimeout(() => setCopied(false), 3000);
   };
 
+  const handleDownloadImage = async () => {
+    setIsGeneratingImage(true);
+    setTimeout(async () => {
+      const el = document.getElementById('liturgia-print-view');
+      if (el) {
+        try {
+          const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', logging: false });
+          const image = canvas.toDataURL('image/png', 1.0);
+          const link = document.createElement('a');
+          link.download = `Liturgia_${event?.title || 'Culto'}_${formatDateShort(event?.date || new Date()).replace(/\//g, '-')}.png`;
+          link.href = image;
+          link.click();
+        } catch (err) {
+          console.error('Error generating image', err);
+          addToast({ type: 'error', title: 'Erro ao gerar imagem' });
+        }
+      }
+      setIsGeneratingImage(false);
+    }, 150);
+  };
+
   if (loading || !event) {
     return (
       <div className="loading-page">
@@ -642,6 +665,9 @@ export default function LiturgyBuilderPage() {
           <h1 className="app-title">Gerador de Liturgia</h1>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <button className="btn btn-secondary btn-sm" onClick={handleDownloadImage} disabled={isGeneratingImage}>
+            📸 {isGeneratingImage ? 'Gerando...' : 'Imagem'}
+          </button>
           <button className="btn btn-outline btn-sm" onClick={handleSave} disabled={saving}>
             {saving ? 'Salvando...' : '💾 Salvar'}
           </button>
@@ -831,6 +857,47 @@ export default function LiturgyBuilderPage() {
           )}
         </div>
       </div>
+
+      {isGeneratingImage && (
+        <div 
+          id="liturgia-print-view" 
+          style={{ 
+            position: 'absolute', top: 0, left: 0, width: '800px', 
+            background: 'white', padding: '40px', color: 'black', 
+            zIndex: -100, fontFamily: 'sans-serif'
+          }}
+        >
+          <h2 style={{ fontSize: '26px', textAlign: 'center', marginBottom: '8px', color: '#111' }}>{event.title}</h2>
+          <h3 style={{ fontSize: '18px', textAlign: 'center', color: '#555', marginBottom: '30px', fontWeight: 'normal' }}>{formatDateShort(event.date)} às {formatTime(event.start_time)}</h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {calculateLiturgyTimes(event.start_time, items).map((item, idx) => (
+               <div key={item.id || idx} style={{ display: 'flex', gap: '20px', borderBottom: '1px solid #eaeaea', paddingBottom: '12px' }}>
+                 <div style={{ fontWeight: 'bold', fontSize: '18px', minWidth: '60px', color: '#4f46e5', paddingTop: '2px' }}>{item.calculated_time}</div>
+                 <div style={{ flex: 1 }}>
+                   <div style={{ fontWeight: 'bold', fontSize: '20px', color: '#222' }}>{item.title}</div>
+                   
+                   {item.is_list && item.list_data && item.list_data.songs && item.list_data.songs.length > 0 ? (
+                     <div style={{ marginTop: '8px' }}>
+                       <div style={{ fontSize: '15px', color: '#444', fontWeight: 'bold' }}>{item.list_data.singers || 'Equipe'}:</div>
+                       <ul style={{ margin: '4px 0 0 20px', padding: 0, fontSize: '15px', color: '#555' }}>
+                         {item.list_data.songs.map((song, i) => (
+                           <li key={i} style={{ marginBottom: '4px' }}>{song}</li>
+                         ))}
+                       </ul>
+                     </div>
+                   ) : (
+                     item.person_name && <div style={{ fontSize: '16px', color: '#444', marginTop: '6px' }}>👤 {item.person_name}</div>
+                   )}
+                   
+                   {item.notes && <div style={{ fontSize: '15px', color: '#666', marginTop: '6px', fontStyle: 'italic' }}>Obs: {item.notes}</div>}
+                 </div>
+                 <div style={{ color: '#888', fontSize: '15px', fontWeight: 500, paddingTop: '4px' }}>{item.duration_minutes} min</div>
+               </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
