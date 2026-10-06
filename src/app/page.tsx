@@ -486,10 +486,12 @@ export default function AgendaPage() {
                                           gap: '4px'
                                         }}
                                       >
-                                        {daysToInclude.length > 1 && <div style={{ fontSize: '0.65rem', opacity: 0.9, fontWeight: 'bold' }}>{getWeekdayName(parseDate(ev.date))}</div>}
-                                        <div style={{ fontWeight: 'bold', fontSize: '0.8rem', lineHeight: '1.2' }}>{text}</div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '4px' }}>
+                                          <div style={{ fontWeight: 'bold', fontSize: isTrimester ? '0.9rem' : '0.8rem', lineHeight: '1.1', flex: 1 }}>{text}</div>
+                                          <div style={{ fontSize: isTrimester ? '0.8rem' : '0.7rem', opacity: 0.9, fontWeight: 500, whiteSpace: 'nowrap' }}>{formatTime(ev.start_time)}</div>
+                                        </div>
                                         {subText && <div style={{ fontSize: '0.75rem', opacity: 0.9, fontStyle: 'italic', lineHeight: '1.1' }}>🎤 {subText}</div>}
-                                        <div style={{ fontSize: '0.65rem', opacity: 0.8, marginTop: '4px' }}>{formatTime(ev.start_time)} • {ev.title}</div>
+                                        {!isTrimester && <div style={{ fontSize: '0.65rem', opacity: 0.8, marginTop: '2px' }}>{ev.title}</div>}
                                       </div>
                                     )
                                 })}
