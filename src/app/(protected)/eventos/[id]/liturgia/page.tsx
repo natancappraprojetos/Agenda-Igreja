@@ -655,6 +655,15 @@ export default function LiturgyBuilderPage() {
     );
   }
 
+  const formatName = (name: string) => {
+    if (!name) return '';
+    const parts = name.trim().split(' ');
+    if (parts.length <= 2) return name;
+    return `${parts[0]} ${parts[1]}`;
+  };
+
+  const isTwoColumns = items.length > 10;
+
   return (
     <div className="app-layout">
       <header className="app-header">
@@ -862,7 +871,7 @@ export default function LiturgyBuilderPage() {
         <div 
           id="liturgia-print-view" 
           style={{ 
-            position: 'absolute', top: 0, left: 0, width: '480px', 
+            position: 'absolute', top: 0, left: 0, width: isTwoColumns ? '920px' : '480px', 
             background: 'white', padding: '30px', color: 'black', 
             zIndex: -100, fontFamily: 'sans-serif'
           }}
@@ -892,36 +901,36 @@ export default function LiturgyBuilderPage() {
           </div>
           
           {/* Items Container */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ columnCount: isTwoColumns ? 2 : 1, columnGap: '16px' }}>
             {items.map((item, idx) => (
-               <div key={item.id || idx} style={{ display: 'flex', background: '#4f46e5', borderRadius: '12px', padding: '16px', gap: '16px', color: 'white' }}>
+               <div key={item.id || idx} style={{ display: 'flex', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '10px 16px', gap: '16px', breakInside: 'avoid', pageBreakInside: 'avoid', marginBottom: '8px' }}>
                  
-                 <div style={{ fontWeight: 800, fontSize: '18px', width: '55px', color: '#ffffff', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                 <div style={{ fontWeight: 800, fontSize: '17px', width: '50px', color: '#4f46e5', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                    {formatTime(item.calculated_time)}
                  </div>
                  
-                 <div style={{ width: '2px', background: 'rgba(255,255,255,0.3)', borderRadius: '2px' }}></div>
+                 <div style={{ width: '2px', background: '#cbd5e1', borderRadius: '2px' }}></div>
                  
                  <div style={{ flex: 1 }}>
-                   <div style={{ fontWeight: 'bold', fontSize: '18px', color: '#ffffff' }}>{item.title}</div>
+                   <div style={{ fontWeight: 'bold', fontSize: '17px', color: '#0f172a' }}>{item.title}</div>
                    
                    {item.is_list && item.list_data && item.list_data.songs && item.list_data.songs.length > 0 ? (
-                     <div style={{ marginTop: '8px', background: '#ffffff', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                       <div style={{ fontSize: '13px', color: '#4f46e5', fontWeight: 700, marginBottom: '4px' }}>🎤 {item.list_data.singers || 'Equipe'}:</div>
-                       <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '14px', color: '#334155' }}>
+                     <div style={{ marginTop: '6px', background: '#ffffff', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                       <div style={{ fontSize: '13px', color: '#475569', fontWeight: 700, marginBottom: '2px' }}>🎤 {item.list_data.singers || 'Equipe'}:</div>
+                       <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#334155' }}>
                          {item.list_data.songs.map((song, i) => (
                            <li key={i} style={{ marginBottom: '2px' }}>{song}</li>
                          ))}
                        </ul>
                      </div>
                    ) : (
-                     item.person_name && <div style={{ fontSize: '15px', color: 'rgba(255,255,255,0.9)', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>👤 <span style={{ fontWeight: 600 }}>{item.person_name}</span></div>
+                     item.person_name && <div style={{ fontSize: '14px', color: '#475569', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>👤 <span style={{ fontWeight: 600 }}>{formatName(item.person_name)}</span></div>
                    )}
                    
-                   {item.notes && <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginTop: '8px', fontStyle: 'italic' }}>📌 {item.notes}</div>}
+                   {item.notes && <div style={{ fontSize: '13px', color: '#64748b', marginTop: '6px', fontStyle: 'italic' }}>📌 {item.notes}</div>}
                  </div>
                  
-                 <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px', fontWeight: 700, alignSelf: 'flex-start', paddingTop: '4px' }}>{item.duration_minutes}m</div>
+                 <div style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 700, alignSelf: 'flex-start', paddingTop: '4px' }}>{item.duration_minutes}m</div>
                </div>
             ))}
           </div>
