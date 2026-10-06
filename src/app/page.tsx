@@ -403,18 +403,127 @@ export default function AgendaPage() {
       columns.push('Recolher Ofertas/Dízimos');
     }
 
-    const groupEventsByMonth = () => {
-       const groups: Record<string, ChurchEvent[]> = {};
-       filteredEvents.forEach(e => {
-          const d = parseDate(e.date);
-          const monthStr = formatMonthYear(d);
-          if (!groups[monthStr]) groups[monthStr] = [];
-          groups[monthStr].push(e);
-       });
-       return groups;
+    const renderMinistryCalendarGrid = (monthDate: Date, isTrimester: boolean) => {
+        const days = getMonthDays(monthDate.getFullYear(), monthDate.getMonth());
+        const weekdays = isTrimester ? ['Domingo', 'Quarta', 'Sábado'] : ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+        const weeks: Date[][] = [];
+        for (let i = 0; i < days.length; i += 7) {
+            weeks.push(days.slice(i, i + 7));
+        }
+
+        return (
+          <div key={monthDate.toISOString()} className="print-page-break" style={{ marginBottom: 'var(--space-8)' }}>
+            <h3 style={{ borderBottom: '2px solid var(--border)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-4)', textAlign: 'center' }}>
+              {formatMonthYear(monthDate)}
+            </h3>
+            <div className="calendar-grid" style={isTrimester ? { gridTemplateColumns: `repeat(3, 1fr)` } : {}}>
+                {weekdays.map(day => (
+                  <div key={day} className="calendar-weekday" style={{ padding: '8px' }}>{day}</div>
+                ))}
+                {weeks.flatMap(week => {
+                    const renderCell = (mainDay: Date, daysToInclude: Date[], colKey: string) => {
+                        const isCurrentMonth = mainDay.getMonth() === monthDate.getMonth();
+                        
+                        // Aggregate events
+                        let cellEvents: ChurchEvent[] = [];
+                        daysToInclude.forEach(d => {
+                            const evs = getEventsForDate(d).filter(e => {
+                                if (selectedMinistry === 'anciao') return e.event_type?.name?.toLowerCase().includes('culto');
+                                if (selectedMinistry === 'sonoplastia') return e.needs_sound || e.event_type?.name?.toLowerCase().includes('culto');
+                                if (selectedMinistry === 'musica') return e.event_type?.name?.toLowerCase().includes('culto');
+                                if (selectedMinistry === 'diacono') return e.event_type?.name?.toLowerCase().includes('culto');
+                                return true;
+                            });
+                            cellEvents = [...cellEvents, ...evs];
+                        });
+
+                        return (
+                            <div
+                              key={colKey}
+                              className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''} ${isToday(mainDay) ? 'today' : ''}`}
+                            >
+                              <div className="calendar-day-header" style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                                <span className="calendar-day-number" style={{ fontWeight: daysToInclude.length > 1 ? 'bold' : 'normal', opacity: daysToInclude.length > 1 ? 0.7 : 1 }}>
+                                   {isTrimester ? (daysToInclude.length > 1 ? `Semana` : mainDay.getDate()) : mainDay.getDate()}
+                                </span>
+                              </div>
+                              <div className="calendar-day-events">
+                                {cellEvents.map(ev => {
+                                     let text = ev.title;
+                                     let subText = '';
+
+                                     if (selectedMinistry === 'anciao') {
+                                       const preacherRole = ev.participants?.find(p => p.role?.name?.toLowerCase().includes('pregador'));
+                                       text = ev.preacher?.name || preacherRole?.person?.name || 'A Definir';
+                                     } else if (selectedMinistry === 'sonoplastia') {
+                                       const soundRole = ev.participants?.find(p => p.role?.name?.toLowerCase().includes('sonoplasta'));
+                                       text = ev.sound_person?.name || soundRole?.person?.name || 'A Definir';
+                                     } else if (selectedMinistry === 'musica') {
+                                       const worshipRole = ev.participants?.find(p => p.role?.name?.toLowerCase().includes('louvor') || p.role?.name?.toLowerCase().includes('música'));
+                                       text = ev.worship_leader?.name || worshipRole?.person?.name || 'A Definir';
+                                       
+                                       const soloRoles = ev.participants?.filter(p => p.role?.name?.toLowerCase().includes('solo') || p.role?.name?.toLowerCase().includes('cantor')) || [];
+                                       const nameSolo = soloRoles.map(r => r.person?.name).filter(Boolean).join(', ');
+                                       if (nameSolo) subText = nameSolo;
+                                     } else if (selectedMinistry === 'diacono') {
+                                       const dRoles = ev.participants?.filter(p => p.role?.name?.toLowerCase().includes('diácono') || p.role?.name?.toLowerCase().includes('oferta')) || [];
+                                       text = dRoles.map(r => r.person?.name).filter(Boolean).join(', ') || 'A Definir';
+                                     }
+
+                                    return (
+                                      <div
+                                        key={ev.id}
+                                        className="calendar-event-pill"
+                                        style={{
+                                          background: ev.event_type?.color || 'var(--primary)',
+                                          color: 'white',
+                                          flexDirection: 'column',
+                                          alignItems: 'flex-start',
+                                          padding: '6px',
+                                          whiteSpace: 'normal',
+                                          height: 'auto',
+                                          gap: '4px'
+                                        }}
+                                      >
+                                        {daysToInclude.length > 1 && <div style={{ fontSize: '0.65rem', opacity: 0.9, fontWeight: 'bold' }}>{getWeekdayName(parseDate(ev.date))}</div>}
+                                        <div style={{ fontWeight: 'bold', fontSize: '0.8rem', lineHeight: '1.2' }}>{text}</div>
+                                        {subText && <div style={{ fontSize: '0.75rem', opacity: 0.9, fontStyle: 'italic', lineHeight: '1.1' }}>🎤 {subText}</div>}
+                                        <div style={{ fontSize: '0.65rem', opacity: 0.8, marginTop: '4px' }}>{formatTime(ev.start_time)} • {ev.title}</div>
+                                      </div>
+                                    )
+                                })}
+                              </div>
+                            </div>
+                        );
+                    };
+
+                    const cells = [];
+                    if (isTrimester) {
+                        cells.push(renderCell(week[0], [week[0]], week[0].toISOString() + 'dom'));
+                        cells.push(renderCell(week[3], [week[1], week[2], week[3], week[4], week[5]], week[0].toISOString() + 'qua'));
+                        cells.push(renderCell(week[6], [week[6]], week[0].toISOString() + 'sab'));
+                    } else {
+                        week.forEach(day => cells.push(renderCell(day, [day], day.toISOString())));
+                    }
+                    return cells;
+                })}
+            </div>
+          </div>
+        );
     };
 
-    const groups = groupEventsByMonth();
+    const renderMinistryAgendas = () => {
+       const monthsToRender = [];
+       if (printPeriod === 'mes') {
+           monthsToRender.push(currentDate);
+       } else {
+           for (let i = 0; i < 3; i++) {
+               monthsToRender.push(new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1));
+           }
+       }
+       return monthsToRender.map(m => renderMinistryCalendarGrid(m, printPeriod === 'trimestre'));
+    };
 
     return (
       <div className="ministry-agenda-container">
@@ -467,67 +576,7 @@ export default function AgendaPage() {
             </p>
           </div>
           
-          {Object.entries(groups).map(([month, evs]) => (
-            <div key={month} className="print-page-break" style={{ marginBottom: 'var(--space-8)' }}>
-              <h3 style={{ borderBottom: '2px solid var(--border)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>{month}</h3>
-              {evs.length === 0 ? (
-                <p className="text-secondary">Nenhum evento neste mês.</p>
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="ministry-print-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                    <thead>
-                      <tr>
-                        {columns.map(c => <th key={c} style={{ borderBottom: '2px solid var(--border)', padding: '12px 8px', background: 'var(--bg-secondary)' }}>{c}</th>)}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {evs.map(ev => {
-                         const d = parseDate(ev.date);
-                         
-                         let specificInfo: React.ReactNode[] = [];
-                         if (selectedMinistry === 'anciao') {
-                           const preacherRole = ev.participants?.find(p => p.role?.name?.toLowerCase().includes('pregador'));
-                           const name = ev.preacher?.name || preacherRole?.person?.name || '';
-                           specificInfo.push(<td key="anciao" style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px' }}>{name}</td>);
-                         } else if (selectedMinistry === 'sonoplastia') {
-                           const soundRole = ev.participants?.find(p => p.role?.name?.toLowerCase().includes('sonoplasta'));
-                           const name = ev.sound_person?.name || soundRole?.person?.name || '';
-                           specificInfo.push(<td key="sono" style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px' }}>{name}</td>);
-                         } else if (selectedMinistry === 'musica') {
-                           const worshipRole = ev.participants?.find(p => p.role?.name?.toLowerCase().includes('louvor') || p.role?.name?.toLowerCase().includes('música'));
-                           const nameResp = ev.worship_leader?.name || worshipRole?.person?.name || '';
-                           
-                           const soloRoles = ev.participants?.filter(p => p.role?.name?.toLowerCase().includes('solo') || p.role?.name?.toLowerCase().includes('cantor')) || [];
-                           const nameSolo = soloRoles.map(r => r.person?.name).filter(Boolean).join(', ') || '';
-                           
-                           specificInfo.push(<td key="mus1" style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px' }}>{nameResp}</td>);
-                           specificInfo.push(<td key="mus2" style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px' }}>{nameSolo}</td>);
-                         } else if (selectedMinistry === 'diacono') {
-                           const dRoles = ev.participants?.filter(p => p.role?.name?.toLowerCase().includes('diácono') || p.role?.name?.toLowerCase().includes('oferta')) || [];
-                           const names = dRoles.map(r => r.person?.name).filter(Boolean).join(', ') || '';
-                           specificInfo.push(<td key="diac" style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px' }}>{names}</td>);
-                         }
-
-                         return (
-                           <tr key={ev.id}>
-                             <td style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px', whiteSpace: 'nowrap' }}>
-                               <strong>{d.getDate().toString().padStart(2, '0')}</strong> - {getWeekdayShort(d)}<br/>
-                               <small className="text-secondary">{formatTime(ev.start_time)}</small>
-                             </td>
-                             <td style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px' }}>
-                               <strong>{ev.title}</strong>
-                               {ev.location && <><br/><small className="text-secondary">{ev.location.name}</small></>}
-                             </td>
-                             {specificInfo}
-                           </tr>
-                         );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ))}
+          {renderMinistryAgendas()}
         </div>
       </div>
     );
