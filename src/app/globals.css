@@ -2194,3 +2194,65 @@ h4 { font-size: var(--font-size-lg); }
     padding: var(--space-2) !important;
   }
 }
+
+/* ============================================================
+   PRINT STYLES
+   ============================================================ */
+@media print {
+  body {
+    background-color: white;
+    color: black;
+  }
+  
+  .app-layout .sidebar,
+  .app-layout .mobile-nav,
+  header,
+  .calendar-header,
+  .print-hide {
+    display: none !important;
+  }
+  
+  .app-main {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .app-content {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-area {
+    width: 100%;
+  }
+  
+  .print-header {
+    display: block !important;
+  }
+
+  .ministry-print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 14px;
+  }
+  .ministry-print-table th, .ministry-print-table td {
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: left;
+  }
+  .ministry-print-table th {
+    background-color: #f3f4f6 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-weight: bold;
+  }
+  .print-page-break {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+}

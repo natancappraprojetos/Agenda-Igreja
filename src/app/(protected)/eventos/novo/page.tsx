@@ -525,7 +525,7 @@ function NovoEventoWizard() {
               <div className="wizard-options">
                 {[
                   { id: 'sabado', name: 'Culto de Sábado', start: '09:00', end: '11:30' },
-                  { id: 'domingo', name: 'Culto de Domingo', start: '19:30', end: '20:30' },
+                  { id: 'domingo', name: 'Culto de Domingo', start: '09:30', end: '10:30' },
                   { id: 'quarta', name: 'Culto de Quarta', start: '19:30', end: '20:30' },
                   { id: 'evangelismo', name: 'Culto Evangelístico', start: '19:30', end: '20:30' },
                   { id: 'jovem', name: 'Culto Jovem', start: '16:00', end: '17:30' },

@@ -26,9 +26,25 @@ export default function AgendaPage() {
   const [addingExtraRole, setAddingExtraRole] = useState(false);
   const [newExtraRoleId, setNewExtraRoleId] = useState('');
   
+  const [agendaType, setAgendaType] = useState<'geral' | 'especifica'>('geral');
+  const [printPeriod, setPrintPeriod] = useState<'mes' | 'trimestre'>('mes');
+  const [selectedMinistry, setSelectedMinistry] = useState<string>('');
+  
   const supabase = createClient();
   const { user, isLeadership, roles } = useAuth();
   const { addToast } = useToast();
+  
+  const hasTeam = roles.some(r => ['musica', 'sonoplastia', 'diacono', 'anciao', 'admin'].includes(r));
+
+  useEffect(() => {
+    if (!selectedMinistry && roles.length > 0) {
+      if (roles.includes('admin')) setSelectedMinistry('anciao');
+      else {
+        const available = ['anciao', 'musica', 'sonoplastia', 'diacono'].find(r => roles.includes(r));
+        if (available) setSelectedMinistry(available);
+      }
+    }
+  }, [roles, selectedMinistry]);
 
   const fetchExtraParticipants = useCallback(async (eventId: string) => {
     const { data: epData } = await supabase
@@ -104,7 +120,12 @@ export default function AgendaPage() {
       let startDate: string;
       let endDate: string;
 
-      if (view === 'month') {
+      if (agendaType === 'especifica' && printPeriod === 'trimestre') {
+        const d = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+        startDate = toDateString(d);
+        const endD = new Date(currentDate.getFullYear(), currentDate.getMonth() + 3, 0);
+        endDate = toDateString(endD);
+      } else if (view === 'month' || agendaType === 'especifica') {
         const days = getMonthDays(currentDate.getFullYear(), currentDate.getMonth());
         startDate = toDateString(days[0]);
         endDate = toDateString(days[days.length - 1]);
@@ -141,7 +162,7 @@ export default function AgendaPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentDate, view, supabase]);
+  }, [currentDate, view, agendaType, printPeriod, supabase]);
 
   useEffect(() => {
     fetchEvents();
@@ -364,6 +385,154 @@ export default function AgendaPage() {
     );
   };
 
+  const renderMinistryAgenda = () => {
+    let filteredEvents = events;
+    let columns = ['Data', 'Evento'];
+    
+    if (selectedMinistry === 'anciao') {
+      filteredEvents = events.filter(e => e.event_type?.name?.toLowerCase().includes('culto'));
+      columns.push('Pregador');
+    } else if (selectedMinistry === 'sonoplastia') {
+      filteredEvents = events.filter(e => e.needs_sound || e.event_type?.name?.toLowerCase().includes('culto'));
+      columns.push('Sonoplasta');
+    } else if (selectedMinistry === 'musica') {
+      filteredEvents = events.filter(e => e.event_type?.name?.toLowerCase().includes('culto'));
+      columns.push('Responsável da Música', 'Cantor / Solo');
+    } else if (selectedMinistry === 'diacono') {
+      filteredEvents = events.filter(e => e.event_type?.name?.toLowerCase().includes('culto'));
+      columns.push('Recolher Ofertas/Dízimos');
+    }
+
+    const groupEventsByMonth = () => {
+       const groups: Record<string, ChurchEvent[]> = {};
+       filteredEvents.forEach(e => {
+          const d = parseDate(e.date);
+          const monthStr = formatMonthYear(d);
+          if (!groups[monthStr]) groups[monthStr] = [];
+          groups[monthStr].push(e);
+       });
+       return groups;
+    };
+
+    const groups = groupEventsByMonth();
+
+    return (
+      <div className="ministry-agenda-container">
+        <div className="print-hide" style={{ display: 'flex', gap: 'var(--space-4)', marginBottom: 'var(--space-4)', flexWrap: 'wrap', alignItems: 'center' }}>
+          
+          {(roles.includes('admin') || roles.length > 1) && (
+            <select 
+              className="form-select" 
+              style={{ width: 'auto' }}
+              value={selectedMinistry} 
+              onChange={e => setSelectedMinistry(e.target.value)}
+            >
+              {(roles.includes('admin') || roles.includes('anciao')) && <option value="anciao">Ancião (Pregadores)</option>}
+              {(roles.includes('admin') || roles.includes('musica')) && <option value="musica">Música</option>}
+              {(roles.includes('admin') || roles.includes('sonoplastia')) && <option value="sonoplastia">Sonoplastia</option>}
+              {(roles.includes('admin') || roles.includes('diacono')) && <option value="diacono">Diaconato</option>}
+            </select>
+          )}
+
+          <div style={{ display: 'flex', gap: 'var(--space-2)', background: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
+            <button 
+              className={`btn btn-sm ${printPeriod === 'mes' ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setPrintPeriod('mes')}
+            >Mês Atual</button>
+            <button 
+              className={`btn btn-sm ${printPeriod === 'trimestre' ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setPrintPeriod('trimestre')}
+            >Trimestre</button>
+          </div>
+
+          <div style={{ flex: 1 }} />
+
+          <button className="btn btn-secondary" onClick={() => window.print()}>
+            🖨️ Gerar PDF
+          </button>
+        </div>
+
+        {/* This block is optimized for printing */}
+        <div className="print-area">
+          <div className="print-header" style={{ display: 'none', marginBottom: '20px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '8px' }}>
+              Agenda Específica - {
+                selectedMinistry === 'anciao' ? 'Pregadores' :
+                selectedMinistry === 'musica' ? 'Ministério da Música' :
+                selectedMinistry === 'sonoplastia' ? 'Sonoplastia' : 'Diaconato'
+              }
+            </h2>
+            <p style={{ fontSize: '1.1rem', color: '#555' }}>
+              {printPeriod === 'mes' ? formatMonthYear(currentDate) : `Trimestre (${formatMonthYear(currentDate)} - ${formatMonthYear(new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 1))})`}
+            </p>
+          </div>
+          
+          {Object.entries(groups).map(([month, evs]) => (
+            <div key={month} className="print-page-break" style={{ marginBottom: 'var(--space-8)' }}>
+              <h3 style={{ borderBottom: '2px solid var(--border)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>{month}</h3>
+              {evs.length === 0 ? (
+                <p className="text-secondary">Nenhum evento neste mês.</p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="ministry-print-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr>
+                        {columns.map(c => <th key={c} style={{ borderBottom: '2px solid var(--border)', padding: '12px 8px', background: 'var(--bg-secondary)' }}>{c}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {evs.map(ev => {
+                         const d = parseDate(ev.date);
+                         
+                         let specificInfo: React.ReactNode[] = [];
+                         if (selectedMinistry === 'anciao') {
+                           const preacherRole = ev.participants?.find(p => p.role?.name?.toLowerCase().includes('pregador'));
+                           const name = ev.preacher?.name || preacherRole?.person?.name || '';
+                           specificInfo.push(<td key="anciao" style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px' }}>{name}</td>);
+                         } else if (selectedMinistry === 'sonoplastia') {
+                           const soundRole = ev.participants?.find(p => p.role?.name?.toLowerCase().includes('sonoplasta'));
+                           const name = ev.sound_person?.name || soundRole?.person?.name || '';
+                           specificInfo.push(<td key="sono" style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px' }}>{name}</td>);
+                         } else if (selectedMinistry === 'musica') {
+                           const worshipRole = ev.participants?.find(p => p.role?.name?.toLowerCase().includes('louvor') || p.role?.name?.toLowerCase().includes('música'));
+                           const nameResp = ev.worship_leader?.name || worshipRole?.person?.name || '';
+                           
+                           const soloRoles = ev.participants?.filter(p => p.role?.name?.toLowerCase().includes('solo') || p.role?.name?.toLowerCase().includes('cantor')) || [];
+                           const nameSolo = soloRoles.map(r => r.person?.name).filter(Boolean).join(', ') || '';
+                           
+                           specificInfo.push(<td key="mus1" style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px' }}>{nameResp}</td>);
+                           specificInfo.push(<td key="mus2" style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px' }}>{nameSolo}</td>);
+                         } else if (selectedMinistry === 'diacono') {
+                           const dRoles = ev.participants?.filter(p => p.role?.name?.toLowerCase().includes('diácono') || p.role?.name?.toLowerCase().includes('oferta')) || [];
+                           const names = dRoles.map(r => r.person?.name).filter(Boolean).join(', ') || '';
+                           specificInfo.push(<td key="diac" style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px' }}>{names}</td>);
+                         }
+
+                         return (
+                           <tr key={ev.id}>
+                             <td style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px', whiteSpace: 'nowrap' }}>
+                               <strong>{d.getDate().toString().padStart(2, '0')}</strong> - {getWeekdayShort(d)}<br/>
+                               <small className="text-secondary">{formatTime(ev.start_time)}</small>
+                             </td>
+                             <td style={{ borderBottom: '1px solid var(--border-light)', padding: '12px 8px' }}>
+                               <strong>{ev.title}</strong>
+                               {ev.location && <><br/><small className="text-secondary">{ev.location.name}</small></>}
+                             </td>
+                             {specificInfo}
+                           </tr>
+                         );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       {/* Header Público */}
@@ -397,7 +566,26 @@ export default function AgendaPage() {
         )}
       </header>
       <div className="app-content">
-        <div className="calendar-header" style={{ gap: 'var(--space-2)' }}>
+        
+        {user && hasTeam && (
+          <div className="print-hide" style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-6)', borderBottom: '1px solid var(--border)', paddingBottom: 'var(--space-3)' }}>
+             <button 
+                className={`btn ${agendaType === 'geral' ? 'btn-primary' : 'btn-ghost'}`} 
+                onClick={() => { setAgendaType('geral'); setPrintPeriod('mes'); }}
+             >
+                📅 Agenda Geral
+             </button>
+             <button 
+                className={`btn ${agendaType === 'especifica' ? 'btn-primary' : 'btn-ghost'}`} 
+                onClick={() => setAgendaType('especifica')}
+             >
+                📋 Agenda Específica
+             </button>
+          </div>
+        )}
+
+        {agendaType === 'geral' && (
+        <div className="calendar-header print-hide" style={{ gap: 'var(--space-2)' }}>
           <div className="calendar-nav" style={{ flexWrap: 'wrap' }}>
             <button className="calendar-nav-btn" onClick={() => navigate(-1)} aria-label="Anterior">
               ◀
@@ -432,18 +620,21 @@ export default function AgendaPage() {
             </button>
           </div>
         </div>
+        )}
 
         {loading ? (
           <div className="loading-page">
             <div className="spinner spinner-lg" />
             <span className="loading-text">Carregando agenda...</span>
           </div>
-        ) : (
+        ) : agendaType === 'geral' ? (
           <>
             {view === 'month' && renderMonthView()}
             {view === 'week' && renderWeekView()}
             {view === 'day' && renderDayView()}
           </>
+        ) : (
+          renderMinistryAgenda()
         )}
 
         {/* Event Detail Modal */}
