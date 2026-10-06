@@ -2259,54 +2259,68 @@ h4 { font-size: var(--font-size-lg); }
     page-break-inside: avoid;
     page-break-after: auto;
   }
-  .print-trimester-wrapper.is-trimester {
-    page-break-inside: avoid !important;
-  }
-  .print-trimester-compact .calendar-day {
-    height: 38px !important;
-    padding: 1px 2px !important;
-    overflow: hidden !important;
-  }
-  .print-trimester-compact .calendar-weekday {
-    padding: 2px !important;
-    font-size: 10px !important;
-    height: 14px !important;
-  }
-  .print-trimester-compact .calendar-day-header {
-    margin-bottom: 0 !important;
-    line-height: 1 !important;
-  }
-  .print-trimester-compact .calendar-day-number {
-    font-size: 9px !important;
-  }
-  .print-trimester-compact .calendar-event-pill {
-    height: 22px !important;
-    padding: 2px 4px !important;
-    margin-bottom: 1px !important;
-    gap: 0 !important;
-    overflow: hidden !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    color-adjust: exact !important;
-  }
-  .print-trimester-compact .calendar-event-pill div {
-    font-size: 9px !important;
-    line-height: 1 !important;
-    margin-top: 0 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }
-  .print-trimester-compact h3 {
-    margin-bottom: 2px !important;
-    font-size: 11px !important;
-    padding-bottom: 0 !important;
-    margin-top: 2px !important;
-  }
-  .print-trimester-compact {
-    margin-bottom: 2px !important;
-    page-break-inside: avoid !important;
-    page-break-after: avoid !important;
-    page-break-before: avoid !important;
-  }
 }
+
+/* ============================================================
+   TRIMESTER COMPACT STYLES (Screen & Print & Image)
+   ============================================================ */
+.print-trimester-wrapper.is-trimester {
+  page-break-inside: avoid !important;
+}
+.print-trimester-compact .calendar-day {
+  height: 48px !important;
+  padding: 2px 4px !important;
+  overflow: hidden !important;
+}
+.print-trimester-compact .calendar-weekday {
+  padding: 4px !important;
+  font-size: 12px !important;
+  height: auto !important;
+}
+.print-trimester-compact .calendar-day-header {
+  margin-bottom: 2px !important;
+  line-height: 1 !important;
+}
+.print-trimester-compact .calendar-day-number {
+  font-size: 12px !important;
+}
+.print-trimester-compact .calendar-event-pill {
+  height: 26px !important;
+  padding: 4px !important;
+  margin-bottom: 2px !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  color-adjust: exact !important;
+}
+.print-trimester-compact .calendar-event-pill div {
+  font-size: 13px !important;
+  line-height: 1.1 !important;
+  margin-top: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.print-trimester-compact h3 {
+  margin-bottom: 4px !important;
+  font-size: 16px !important;
+  padding-bottom: 2px !important;
+  margin-top: 4px !important;
+}
+.print-trimester-compact {
+  margin-bottom: 8px !important;
+  page-break-inside: avoid !important;
+  page-break-after: avoid !important;
+  page-break-before: avoid !important;
+}
+
+/* Hide app UI elements when generating image */
+.generating-image .print-hide {
+  display: none !important;
+}
+.generating-image {
+  padding: 20px;
+  background: white;
+}
+

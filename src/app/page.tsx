@@ -13,6 +13,7 @@ import {
   formatDayMonth, toDateString, parseDate, formatDateShort,
 } from '@/lib/utils/dates';
 import { formatTime } from '@/lib/utils/liturgy-calculator';
+import html2canvas from 'html2canvas';
 
 export default function AgendaPage() {
   const [view, setView] = useState<CalendarView>('month');
@@ -383,6 +384,30 @@ export default function AgendaPage() {
         </div>
       </div>
     );
+
+
+  const handleDownloadImage = async () => {
+    const printArea = document.querySelector('.print-area');
+    if (!printArea) return;
+    
+    try {
+      printArea.classList.add('generating-image');
+      const canvas = await html2canvas(printArea as HTMLElement, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+      printArea.classList.remove('generating-image');
+      
+      const image = canvas.toDataURL('image/png', 1.0);
+      const link = document.createElement('a');
+      link.download = `Agenda_${selectedMinistry}_${formatMonthYear(currentDate)}.png`;
+      link.href = image;
+      link.click();
+    } catch (err) {
+      console.error('Error generating image', err);
+      printArea.classList.remove('generating-image');
+    }
   };
 
   const renderMinistryAgenda = () => {
@@ -449,7 +474,12 @@ export default function AgendaPage() {
                                 </span>
                               </div>
                               <div className="calendar-day-events">
-                                {cellEvents.map(ev => {
+                                {cellEvents.length === 0 ? (
+                                  <div className="calendar-event-pill" style={{ background: '#e5e7eb', color: '#6b7280', padding: isTrimester ? '2px 4px' : '6px', textAlign: 'center', fontStyle: 'italic', fontSize: isTrimester ? '0.75rem' : '0.8rem', opacity: 0.7 }}>
+                                    A Definir
+                                  </div>
+                                ) : (
+                                  cellEvents.map(ev => {
                                      let text = ev.title;
                                      let subText = '';
 
@@ -494,7 +524,8 @@ export default function AgendaPage() {
                                         {!isTrimester && <div style={{ fontSize: '0.65rem', opacity: 0.8, marginTop: '2px' }}>{ev.title}</div>}
                                       </div>
                                     )
-                                })}
+                                  })
+                                )}
                               </div>
                             </div>
                         );
@@ -567,9 +598,14 @@ export default function AgendaPage() {
 
           <div style={{ flex: 1 }} />
 
-          <button className="btn btn-secondary" onClick={() => window.print()}>
-            🖨️ Gerar PDF
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn btn-secondary" onClick={handleDownloadImage}>
+              📸 Imagem
+            </button>
+            <button className="btn btn-secondary" onClick={() => window.print()}>
+              🖨️ PDF
+            </button>
+          </div>
         </div>
 
         {/* This block is optimized for printing */}
