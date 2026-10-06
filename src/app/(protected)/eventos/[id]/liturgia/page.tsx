@@ -664,15 +664,15 @@ export default function LiturgyBuilderPage() {
           </button>
           <h1 className="app-title">Gerador de Liturgia</h1>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-          <button className="btn btn-secondary btn-sm" onClick={handleDownloadImage} disabled={isGeneratingImage}>
-            📸 {isGeneratingImage ? 'Gerando...' : 'Imagem'}
-          </button>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
           <button className="btn btn-outline btn-sm" onClick={handleSave} disabled={saving}>
             {saving ? 'Salvando...' : '💾 Salvar'}
           </button>
           <button className={`btn btn-${copied ? 'success' : 'primary'} btn-sm`} onClick={copyToWhatsApp}>
-            {copied ? '✅ Copiado!' : '📱 Copiar (WhatsApp)'}
+            {copied ? '✅ Copiado!' : '📱 Copiar WhatsApp'}
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={handleDownloadImage} disabled={isGeneratingImage}>
+            📸 {isGeneratingImage ? 'Gerando...' : 'Imagem WhatsApp'}
           </button>
         </div>
       </header>
@@ -862,18 +862,18 @@ export default function LiturgyBuilderPage() {
         <div 
           id="liturgia-print-view" 
           style={{ 
-            position: 'absolute', top: 0, left: 0, width: '800px', 
-            background: 'white', padding: '40px', color: 'black', 
+            position: 'absolute', top: 0, left: 0, width: '480px', 
+            background: 'white', padding: '30px', color: 'black', 
             zIndex: -100, fontFamily: 'sans-serif'
           }}
         >
-          <h2 style={{ fontSize: '26px', textAlign: 'center', marginBottom: '8px', color: '#111' }}>{event.title}</h2>
-          <h3 style={{ fontSize: '18px', textAlign: 'center', color: '#555', marginBottom: '30px', fontWeight: 'normal' }}>{formatDateShort(event.date)} às {formatTime(event.start_time)}</h3>
+          <h2 style={{ fontSize: '24px', textAlign: 'center', marginBottom: '8px', color: '#111' }}>{event.title}</h2>
+          <h3 style={{ fontSize: '16px', textAlign: 'center', color: '#555', marginBottom: '30px', fontWeight: 'normal' }}>{formatDateShort(event.date)} às {formatTime(event.start_time)}</h3>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {items.map((item, idx) => (
-               <div key={item.id || idx} style={{ display: 'flex', gap: '20px', borderBottom: '1px solid #eaeaea', paddingBottom: '12px' }}>
-                 <div style={{ fontWeight: 'bold', fontSize: '18px', minWidth: '60px', color: '#4f46e5', paddingTop: '2px' }}>{formatTime(item.calculated_time)}</div>
+               <div key={item.id || idx} style={{ display: 'flex', borderBottom: '1px solid #d1d5db', paddingBottom: '12px' }}>
+                 <div style={{ fontWeight: 'bold', fontSize: '18px', width: '60px', color: '#4f46e5', paddingTop: '2px', borderRight: '2px solid #e5e7eb', marginRight: '16px', flexShrink: 0 }}>{formatTime(item.calculated_time)}</div>
                  <div style={{ flex: 1 }}>
                    <div style={{ fontWeight: 'bold', fontSize: '20px', color: '#222' }}>{item.title}</div>
                    
