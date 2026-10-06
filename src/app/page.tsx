@@ -413,8 +413,8 @@ export default function AgendaPage() {
         }
 
         return (
-          <div key={monthDate.toISOString()} className={`print-page-break ${isTrimester ? 'print-trimester-compact' : ''}`} style={{ marginBottom: isTrimester ? 'var(--space-2)' : 'var(--space-8)' }}>
-            <h3 style={{ borderBottom: '2px solid var(--border)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-4)', textAlign: 'center' }}>
+          <div key={monthDate.toISOString()} className={isTrimester ? 'print-trimester-compact' : 'print-page-break'} style={{ marginBottom: isTrimester ? 'var(--space-2)' : 'var(--space-8)' }}>
+            <h3 style={{ borderBottom: '1px solid var(--border)', paddingBottom: 'var(--space-1)', marginBottom: 'var(--space-2)', textAlign: 'center' }}>
               {formatMonthYear(monthDate)}
             </h3>
             <div className="calendar-grid" style={isTrimester ? { gridTemplateColumns: `repeat(3, 1fr)` } : {}}>
@@ -546,7 +546,13 @@ export default function AgendaPage() {
             </select>
           )}
 
-          <div style={{ display: 'flex', gap: 'var(--space-2)', background: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+            <button className="calendar-nav-btn" onClick={() => navigate(-1)}>◀</button>
+            <button className="calendar-nav-btn" onClick={goToday}>Hoje</button>
+            <button className="calendar-nav-btn" onClick={() => navigate(1)}>▶</button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 'var(--space-2)', background: 'var(--bg-secondary)', padding: '4px', borderRadius: 'var(--radius-md)', marginLeft: 'var(--space-2)' }}>
             <button 
               className={`btn btn-sm ${printPeriod === 'mes' ? 'btn-primary' : 'btn-ghost'}`}
               onClick={() => setPrintPeriod('mes')}
@@ -579,7 +585,9 @@ export default function AgendaPage() {
             </p>
           </div>
           
-          {renderMinistryAgendas()}
+          <div className={`print-trimester-wrapper ${printPeriod === 'trimestre' ? 'is-trimester' : ''}`}>
+            {renderMinistryAgendas()}
+          </div>
         </div>
       </div>
     );
