@@ -413,7 +413,7 @@ export default function AgendaPage() {
         }
 
         return (
-          <div key={monthDate.toISOString()} className="print-page-break" style={{ marginBottom: 'var(--space-8)' }}>
+          <div key={monthDate.toISOString()} className={`print-page-break ${isTrimester ? 'print-trimester-compact' : ''}`} style={{ marginBottom: isTrimester ? 'var(--space-2)' : 'var(--space-8)' }}>
             <h3 style={{ borderBottom: '2px solid var(--border)', paddingBottom: 'var(--space-2)', marginBottom: 'var(--space-4)', textAlign: 'center' }}>
               {formatMonthYear(monthDate)}
             </h3>
@@ -518,8 +518,11 @@ export default function AgendaPage() {
        if (printPeriod === 'mes') {
            monthsToRender.push(currentDate);
        } else {
+           const currentMonthIndex = currentDate.getMonth();
+           const quarterStartMonthIndex = Math.floor(currentMonthIndex / 3) * 3;
+           
            for (let i = 0; i < 3; i++) {
-               monthsToRender.push(new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1));
+               monthsToRender.push(new Date(currentDate.getFullYear(), quarterStartMonthIndex + i, 1));
            }
        }
        return monthsToRender.map(m => renderMinistryCalendarGrid(m, printPeriod === 'trimestre'));
