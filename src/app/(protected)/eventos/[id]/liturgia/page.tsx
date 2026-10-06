@@ -867,32 +867,61 @@ export default function LiturgyBuilderPage() {
             zIndex: -100, fontFamily: 'sans-serif'
           }}
         >
-          <h2 style={{ fontSize: '24px', textAlign: 'center', marginBottom: '8px', color: '#111' }}>{event.title}</h2>
-          <h3 style={{ fontSize: '16px', textAlign: 'center', color: '#555', marginBottom: '30px', fontWeight: 'normal' }}>{formatDateShort(event.date)} às {formatTime(event.start_time)}</h3>
+          {/* Header styling */}
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px', paddingBottom: '16px', borderBottom: '2px solid #f3f4f6' }}>
+            <img src="/icon.jpg" alt="Logo" style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #e5e7eb' }} />
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <h2 style={{ fontSize: '26px', margin: '0 0 4px 0', color: '#1f2937', fontFamily: 'Georgia, serif', fontWeight: 800 }}>{event.title}</h2>
+              <div style={{ fontSize: '14px', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <span style={{ marginRight: '12px' }}>📅 {formatDateShort(event.date)}</span>
+                <span>⏰ {formatTime(event.start_time)}</span>
+              </div>
+            </div>
+            <div style={{ width: '60px' }}></div> {/* Spacer for centering */}
+          </div>
+
+          {/* Sonoplasta */}
+          <div style={{ background: '#f8fafc', borderRadius: '8px', padding: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #e2e8f0' }}>
+            <span style={{ fontSize: '24px' }}>🔊</span>
+            <div>
+              <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Sonoplastia do dia</div>
+              <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
+                {event.sound_person?.name || event.participants?.find((p: any) => p.role?.name?.toLowerCase().includes('sonoplasta'))?.person?.name || 'A Definir'}
+              </div>
+            </div>
+          </div>
           
+          {/* Items Container */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {items.map((item, idx) => (
-               <div key={item.id || idx} style={{ display: 'flex', borderBottom: '1px solid #d1d5db', paddingBottom: '12px' }}>
-                 <div style={{ fontWeight: 'bold', fontSize: '18px', width: '60px', color: '#4f46e5', paddingTop: '2px', borderRight: '2px solid #e5e7eb', marginRight: '16px', flexShrink: 0 }}>{formatTime(item.calculated_time)}</div>
+               <div key={item.id || idx} style={{ display: 'flex', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '16px', gap: '16px' }}>
+                 
+                 <div style={{ fontWeight: 800, fontSize: '18px', width: '55px', color: '#4f46e5', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                   {formatTime(item.calculated_time)}
+                 </div>
+                 
+                 <div style={{ width: '2px', background: '#cbd5e1', borderRadius: '2px' }}></div>
+                 
                  <div style={{ flex: 1 }}>
-                   <div style={{ fontWeight: 'bold', fontSize: '20px', color: '#222' }}>{item.title}</div>
+                   <div style={{ fontWeight: 'bold', fontSize: '18px', color: '#0f172a' }}>{item.title}</div>
                    
                    {item.is_list && item.list_data && item.list_data.songs && item.list_data.songs.length > 0 ? (
-                     <div style={{ marginTop: '8px' }}>
-                       <div style={{ fontSize: '15px', color: '#444', fontWeight: 'bold' }}>{item.list_data.singers || 'Equipe'}:</div>
-                       <ul style={{ margin: '4px 0 0 20px', padding: 0, fontSize: '15px', color: '#555' }}>
+                     <div style={{ marginTop: '8px', background: '#ffffff', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                       <div style={{ fontSize: '13px', color: '#475569', fontWeight: 700, marginBottom: '4px' }}>🎤 {item.list_data.singers || 'Equipe'}:</div>
+                       <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '14px', color: '#334155' }}>
                          {item.list_data.songs.map((song, i) => (
-                           <li key={i} style={{ marginBottom: '4px' }}>{song}</li>
+                           <li key={i} style={{ marginBottom: '2px' }}>{song}</li>
                          ))}
                        </ul>
                      </div>
                    ) : (
-                     item.person_name && <div style={{ fontSize: '16px', color: '#444', marginTop: '6px' }}>👤 {item.person_name}</div>
+                     item.person_name && <div style={{ fontSize: '15px', color: '#475569', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>👤 <span style={{ fontWeight: 600 }}>{item.person_name}</span></div>
                    )}
                    
-                   {item.notes && <div style={{ fontSize: '15px', color: '#666', marginTop: '6px', fontStyle: 'italic' }}>Obs: {item.notes}</div>}
+                   {item.notes && <div style={{ fontSize: '13px', color: '#64748b', marginTop: '8px', fontStyle: 'italic' }}>📌 {item.notes}</div>}
                  </div>
-                 <div style={{ color: '#888', fontSize: '15px', fontWeight: 500, paddingTop: '4px' }}>{item.duration_minutes} min</div>
+                 
+                 <div style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 700, alignSelf: 'flex-start', paddingTop: '4px' }}>{item.duration_minutes}m</div>
                </div>
             ))}
           </div>
