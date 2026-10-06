@@ -639,7 +639,10 @@ export default function AgendaPage() {
                 className={`btn ${agendaType === 'especifica' ? 'btn-primary' : 'btn-ghost'}`} 
                 onClick={() => setAgendaType('especifica')}
              >
-                📋 Agenda Específica
+                📋 {selectedMinistry === 'anciao' ? 'Agenda Ancionato' : 
+                    selectedMinistry === 'sonoplastia' ? 'Agenda Sonoplastia' :
+                    selectedMinistry === 'musica' ? 'Agenda Música' :
+                    selectedMinistry === 'diacono' ? 'Agenda Diaconato' : 'Agenda Específica'}
              </button>
           </div>
         )}
