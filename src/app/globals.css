@@ -2230,8 +2230,12 @@ h4 { font-size: var(--font-size-lg); }
     width: 100%;
   }
   
+  @page {
+    margin: 5mm;
+  }
+  
   .print-header {
-    display: block !important;
+    display: none !important;
   }
 
   .ministry-print-table {
