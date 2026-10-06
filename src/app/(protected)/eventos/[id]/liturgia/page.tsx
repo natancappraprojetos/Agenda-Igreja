@@ -871,9 +871,9 @@ export default function LiturgyBuilderPage() {
           <h3 style={{ fontSize: '18px', textAlign: 'center', color: '#555', marginBottom: '30px', fontWeight: 'normal' }}>{formatDateShort(event.date)} às {formatTime(event.start_time)}</h3>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {calculateLiturgyTimes(event.start_time, items).map((item, idx) => (
+            {items.map((item, idx) => (
                <div key={item.id || idx} style={{ display: 'flex', gap: '20px', borderBottom: '1px solid #eaeaea', paddingBottom: '12px' }}>
-                 <div style={{ fontWeight: 'bold', fontSize: '18px', minWidth: '60px', color: '#4f46e5', paddingTop: '2px' }}>{item.calculated_time}</div>
+                 <div style={{ fontWeight: 'bold', fontSize: '18px', minWidth: '60px', color: '#4f46e5', paddingTop: '2px' }}>{formatTime(item.calculated_time)}</div>
                  <div style={{ flex: 1 }}>
                    <div style={{ fontWeight: 'bold', fontSize: '20px', color: '#222' }}>{item.title}</div>
                    
