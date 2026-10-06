@@ -2322,5 +2322,8 @@ h4 { font-size: var(--font-size-lg); }
 .generating-image {
   padding: 20px;
   background: white;
+  width: 750px !important;
+  max-width: 750px !important;
+  margin: 0 auto;
 }
 
