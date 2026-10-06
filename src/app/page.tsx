@@ -464,23 +464,25 @@ export default function AgendaPage() {
                             cellEvents = [...cellEvents, ...evs];
                         });
 
+                        if (!isCurrentMonth) {
+                          return <div key={colKey} className="calendar-day" style={{ background: 'transparent' }}></div>;
+                        }
+
                         return (
                             <div
                               key={colKey}
-                              className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''} ${isToday(mainDay) ? 'today' : ''}`}
+                              className={`calendar-day ${isToday(mainDay) ? 'today' : ''}`}
                             >
                               <div className="calendar-day-header" style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                                <span className="calendar-day-number" style={{ fontWeight: daysToInclude.length > 1 ? 'bold' : 'normal', opacity: daysToInclude.length > 1 ? 0.7 : 1 }}>
-                                   {isTrimester ? (daysToInclude.length > 1 ? `Semana` : mainDay.getDate()) : mainDay.getDate()}
+                                <span className="calendar-day-number" style={{ fontWeight: 'bold' }}>
+                                   {mainDay.getDate()}
                                 </span>
                               </div>
                               <div className="calendar-day-events">
                                 {cellEvents.length === 0 ? (
-                                  isCurrentMonth ? (
-                                    <div className="calendar-event-pill" style={{ background: '#e5e7eb', color: '#6b7280', padding: isTrimester ? '2px 4px' : '6px', textAlign: 'center', fontStyle: 'italic', fontSize: isTrimester ? '0.75rem' : '0.8rem', opacity: 0.7 }}>
-                                      A Definir
-                                    </div>
-                                  ) : null
+                                  <div className="calendar-event-pill" style={{ background: '#e5e7eb', color: '#6b7280', padding: isTrimester ? '2px 4px' : '6px', textAlign: 'center', fontStyle: 'italic', fontSize: isTrimester ? '0.75rem' : '0.8rem', opacity: 0.7 }}>
+                                    A Definir
+                                  </div>
                                 ) : (
                                   cellEvents.map(ev => {
                                      let text = ev.title;
