@@ -384,6 +384,7 @@ export default function AgendaPage() {
         </div>
       </div>
     );
+  };
 
 
   const handleDownloadImage = async () => {
