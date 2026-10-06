@@ -34,13 +34,13 @@ export default function AgendaPage() {
   const { user, isLeadership, roles } = useAuth();
   const { addToast } = useToast();
   
-  const hasTeam = roles.some(r => ['musica', 'sonoplastia', 'diacono', 'anciao', 'admin'].includes(r));
+  const hasTeam = roles.some(r => (['musica', 'sonoplastia', 'diacono', 'anciao', 'admin'] as AppRoleName[]).includes(r));
 
   useEffect(() => {
     if (!selectedMinistry && roles.length > 0) {
       if (roles.includes('admin')) setSelectedMinistry('anciao');
       else {
-        const available = ['anciao', 'musica', 'sonoplastia', 'diacono'].find(r => roles.includes(r));
+        const available = (['anciao', 'musica', 'sonoplastia', 'diacono'] as AppRoleName[]).find(r => roles.includes(r));
         if (available) setSelectedMinistry(available);
       }
     }
