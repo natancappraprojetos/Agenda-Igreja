@@ -31,6 +31,9 @@ export default function AgendaPage() {
   const [printPeriod, setPrintPeriod] = useState<'mes' | 'trimestre'>('mes');
   const [selectedMinistry, setSelectedMinistry] = useState<string>('');
   
+  const [locations, setLocations] = useState<any[]>([]);
+  const [eventTypes, setEventTypes] = useState<any[]>([]);
+
   const supabase = createClient();
   const { user, isLeadership, roles } = useAuth();
   const { addToast } = useToast();
@@ -46,6 +49,20 @@ export default function AgendaPage() {
       }
     }
   }, [roles, selectedMinistry]);
+
+  useEffect(() => {
+    if (roles.includes('admin') || roles.includes('anciao')) {
+      const fetchLookups = async () => {
+        const [locs, types] = await Promise.all([
+          supabase.from('locations').select('*').eq('is_active', true).order('name'),
+          supabase.from('event_types').select('*').eq('is_active', true).order('sort_order')
+        ]);
+        if (locs.data) setLocations(locs.data);
+        if (types.data) setEventTypes(types.data);
+      };
+      fetchLookups();
+    }
+  }, [roles, supabase]);
 
   const fetchExtraParticipants = useCallback(async (eventId: string) => {
     const { data: epData } = await supabase
@@ -64,9 +81,9 @@ export default function AgendaPage() {
     }
   }, [selectedEvent?.id, fetchExtraParticipants]);
 
-  const handleUpdateRole = async (eventId: string, field: string, personId: string | null) => {
+  const handleUpdateEventField = async (eventId: string, field: string, value: any) => {
     try {
-      const { error } = await supabase.from('events').update({ [field]: personId }).eq('id', eventId);
+      const { error } = await supabase.from('events').update({ [field]: value }).eq('id', eventId);
       if (error) throw error;
       
       const { data } = await supabase
@@ -78,7 +95,8 @@ export default function AgendaPage() {
           preacher:people!events_preacher_id_fkey(*),
           worship_leader:people!events_worship_leader_id_fkey(*),
           sound_person:people!events_sound_person_id_fkey(*),
-          responsible_person:people!events_responsible_person_id_fkey(*)
+          responsible_person:people!events_responsible_person_id_fkey(*),
+          participants:event_participants(role:roles(name), person:people(name, id))
         `)
         .eq('id', eventId)
         .single();
@@ -757,29 +775,90 @@ export default function AgendaPage() {
               </div>
               <div className="modal-body">
                 <div className="review-grid">
-                  <div className="review-section">
+                  <div className="review-section" style={{ overflow: 'visible' }}>
                     <div className="review-label">Data</div>
-                    <div className="review-value">{formatDateShort(selectedEvent.date)}</div>
-                  </div>
-                  <div className="review-section">
-                    <div className="review-label">Horário</div>
                     <div className="review-value">
-                      {formatTime(selectedEvent.start_time)}
-                      {selectedEvent.end_time && ` — ${formatTime(selectedEvent.end_time)}`}
+                      {(roles.includes('admin') || roles.includes('anciao')) ? (
+                        <input 
+                          type="date" 
+                          className="form-input" 
+                          style={{ padding: '4px 8px', height: 'auto', fontSize: '0.9rem' }}
+                          value={selectedEvent.date} 
+                          onChange={(e) => handleUpdateEventField(selectedEvent.id, 'date', e.target.value)} 
+                        />
+                      ) : (
+                        formatDateShort(selectedEvent.date)
+                      )}
                     </div>
                   </div>
-                  <div className="review-section">
+                  <div className="review-section" style={{ overflow: 'visible' }}>
+                    <div className="review-label">Horário</div>
+                    <div className="review-value" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      {(roles.includes('admin') || roles.includes('anciao')) ? (
+                        <>
+                          <input 
+                            type="time" 
+                            className="form-input" 
+                            style={{ padding: '4px 8px', height: 'auto', fontSize: '0.9rem', width: 'auto' }}
+                            value={selectedEvent.start_time?.substring(0,5) || ''} 
+                            onChange={(e) => handleUpdateEventField(selectedEvent.id, 'start_time', e.target.value)} 
+                          />
+                          —
+                          <input 
+                            type="time" 
+                            className="form-input" 
+                            style={{ padding: '4px 8px', height: 'auto', fontSize: '0.9rem', width: 'auto' }}
+                            value={selectedEvent.end_time?.substring(0,5) || ''} 
+                            onChange={(e) => handleUpdateEventField(selectedEvent.id, 'end_time', e.target.value || null)} 
+                          />
+                        </>
+                      ) : (
+                        <>
+                          {formatTime(selectedEvent.start_time)}
+                          {selectedEvent.end_time && ` — ${formatTime(selectedEvent.end_time)}`}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="review-section" style={{ overflow: 'visible' }}>
                     <div className="review-label">Local</div>
                     <div className="review-value">
-                      {selectedEvent.location?.name || '—'}
+                      {(roles.includes('admin') || roles.includes('anciao')) ? (
+                        <select 
+                          className="form-select" 
+                          style={{ padding: '4px 8px', height: 'auto', fontSize: '0.9rem' }}
+                          value={selectedEvent.location_id || ''} 
+                          onChange={(e) => handleUpdateEventField(selectedEvent.id, 'location_id', e.target.value || null)}
+                        >
+                          <option value="">Não definido</option>
+                          {locations.map(loc => (
+                            <option key={loc.id} value={loc.id}>{loc.name}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        selectedEvent.location?.name || '—'
+                      )}
                     </div>
                   </div>
-                  <div className="review-section">
+                  <div className="review-section" style={{ overflow: 'visible' }}>
                     <div className="review-label">Tipo</div>
                     <div className="review-value">
-                      <span className="badge badge-primary">
-                        {selectedEvent.event_type?.icon} {selectedEvent.event_type?.name}
-                      </span>
+                      {(roles.includes('admin') || roles.includes('anciao')) ? (
+                        <select 
+                          className="form-select" 
+                          style={{ padding: '4px 8px', height: 'auto', fontSize: '0.9rem' }}
+                          value={selectedEvent.event_type_id || ''} 
+                          onChange={(e) => handleUpdateEventField(selectedEvent.id, 'event_type_id', e.target.value)}
+                        >
+                          {eventTypes.map(type => (
+                            <option key={type.id} value={type.id}>{type.icon} {type.name}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="badge badge-primary">
+                          {selectedEvent.event_type?.icon} {selectedEvent.event_type?.name}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -806,7 +885,7 @@ export default function AgendaPage() {
                         {user ? (
                           <PersonSelect 
                             value={personInfo.id} 
-                            onChange={(val) => handleUpdateRole(selectedEvent.id, fieldId, val)} 
+                            onChange={(val) => handleUpdateEventField(selectedEvent.id, fieldId, val)} 
                             placeholder="Definir..." 
                           />
                         ) : (
