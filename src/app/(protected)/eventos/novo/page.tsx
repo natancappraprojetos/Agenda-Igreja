@@ -13,10 +13,12 @@ import type { EventType, Location, Ministry, Person } from '@/lib/types';
 import { Suspense } from 'react';
 import ProtectedRoute from '@/components/ui/ProtectedRoute';
 import { createPersonAdmin } from '@/app/actions';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 const TOTAL_STEPS = 8;
 
 function NovoEventoWizard() {
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -367,7 +369,8 @@ function NovoEventoWizard() {
         needs_sound: isCulto,
         needs_worship: isCulto,
         needs_deaconry: isCulto,
-        status: 'scheduled'
+        status: 'scheduled',
+        created_by: user?.id || null
       };
 
       // Verifica se já existe um rascunho de escala para este dia e horário

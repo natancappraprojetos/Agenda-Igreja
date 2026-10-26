@@ -14,6 +14,8 @@ import {
 } from '@/lib/utils/dates';
 import { formatTime } from '@/lib/utils/liturgy-calculator';
 import html2canvas from 'html2canvas';
+import { canManageEvent } from '@/lib/utils/permissions';
+import { deleteEventAction } from '@/app/actions';
 
 export default function AgendaPage() {
   const [view, setView] = useState<CalendarView>('month');
@@ -109,6 +111,24 @@ export default function AgendaPage() {
     } catch (err) {
       console.error(err);
       addToast({ type: 'error', title: 'Erro ao atualizar' });
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm('Deseja realmente excluir este evento da agenda? Todas as escalas vinculadas a ele serão removidas.')) return;
+    try {
+      setLoading(true);
+      const res = await deleteEventAction(eventId);
+      if (res.success) {
+        addToast({ type: 'success', title: 'Evento excluído com sucesso!' });
+        setSelectedEvent(null);
+        setEvents(prev => prev.filter(e => e.id !== eventId));
+      }
+    } catch (err: any) {
+      console.error(err);
+      addToast({ type: 'error', title: 'Erro ao excluir evento', message: err.message });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -764,13 +784,35 @@ export default function AgendaPage() {
         )}
 
         {/* Event Detail Modal */}
-        {selectedEvent && (
+        {selectedEvent && (() => {
+          const { canEdit: canEditSelectedEvent, canDelete: canDeleteSelectedEvent, isCreator: isSelectedEventCreator } = canManageEvent(selectedEvent, user, roles, isLeadership);
+
+          return (
           <div className="modal-backdrop" onClick={() => setSelectedEvent(null)}>
             <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
               <div className="modal-header">
-                <h2 className="modal-title">
-                  {selectedEvent.event_type?.icon} {selectedEvent.title}
-                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0, marginRight: '12px' }}>
+                  <span style={{ fontSize: '1.4rem' }}>{selectedEvent.event_type?.icon}</span>
+                  {canEditSelectedEvent ? (
+                    <input
+                      type="text"
+                      className="form-input"
+                      style={{ fontWeight: 700, fontSize: '1.2rem', padding: '4px 8px', flex: 1 }}
+                      value={selectedEvent.title}
+                      onChange={(e) => handleUpdateEventField(selectedEvent.id, 'title', e.target.value)}
+                      title="Clique para editar o título"
+                    />
+                  ) : (
+                    <h2 className="modal-title" style={{ margin: 0, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                      {selectedEvent.title}
+                    </h2>
+                  )}
+                  {isSelectedEventCreator && (
+                    <span className="badge badge-neutral" style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                      Criado por você
+                    </span>
+                  )}
+                </div>
                 <button className="modal-close" onClick={() => setSelectedEvent(null)}>×</button>
               </div>
               <div className="modal-body">
@@ -778,7 +820,7 @@ export default function AgendaPage() {
                   <div className="review-section" style={{ overflow: 'visible' }}>
                     <div className="review-label">Data</div>
                     <div className="review-value">
-                      {(roles.includes('admin') || roles.includes('anciao')) ? (
+                      {canEditSelectedEvent ? (
                         <input 
                           type="date" 
                           className="form-input" 
@@ -794,7 +836,7 @@ export default function AgendaPage() {
                   <div className="review-section" style={{ overflow: 'visible' }}>
                     <div className="review-label">Horário</div>
                     <div className="review-value" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                      {(roles.includes('admin') || roles.includes('anciao')) ? (
+                      {canEditSelectedEvent ? (
                         <>
                           <input 
                             type="time" 
@@ -823,7 +865,7 @@ export default function AgendaPage() {
                   <div className="review-section" style={{ overflow: 'visible' }}>
                     <div className="review-label">Local</div>
                     <div className="review-value">
-                      {(roles.includes('admin') || roles.includes('anciao')) ? (
+                      {canEditSelectedEvent ? (
                         <select 
                           className="form-select" 
                           style={{ padding: '4px 8px', height: 'auto', fontSize: '0.9rem' }}
@@ -843,7 +885,7 @@ export default function AgendaPage() {
                   <div className="review-section" style={{ overflow: 'visible' }}>
                     <div className="review-label">Tipo</div>
                     <div className="review-value">
-                      {(roles.includes('admin') || roles.includes('anciao')) ? (
+                      {canEditSelectedEvent ? (
                         <select 
                           className="form-select" 
                           style={{ padding: '4px 8px', height: 'auto', fontSize: '0.9rem' }}
@@ -1036,26 +1078,48 @@ export default function AgendaPage() {
                 )}
               </div>
               {user && (
-                <div className="modal-footer">
-                  {selectedEvent.event_type?.name?.toLowerCase().includes('culto') && (
+                <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    {canDeleteSelectedEvent && (
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        onClick={() => handleDeleteEvent(selectedEvent.id)}
+                      >
+                        🗑️ Excluir Evento
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {canEditSelectedEvent && (
+                      <Link
+                        href={`/eventos/${selectedEvent.id}/editar`}
+                        className="btn btn-secondary"
+                      >
+                        ✏️ Editar
+                      </Link>
+                    )}
+                    {selectedEvent.event_type?.name?.toLowerCase().includes('culto') && (
+                      <Link
+                        href={`/eventos/${selectedEvent.id}/liturgia`}
+                        className="btn btn-secondary"
+                      >
+                        📜 Liturgia
+                      </Link>
+                    )}
                     <Link
-                      href={`/eventos/${selectedEvent.id}/liturgia`}
-                      className="btn btn-secondary"
+                      href={`/eventos/${selectedEvent.id}`}
+                      className="btn btn-primary"
                     >
-                      📜 Liturgia
+                      Ver Detalhes
                     </Link>
-                  )}
-                  <Link
-                    href={`/eventos/${selectedEvent.id}`}
-                    className="btn btn-primary"
-                  >
-                    Ver Detalhes
-                  </Link>
+                  </div>
                 </div>
               )}
             </div>
           </div>
-        )}
+          );
+        })()}
       </div>
     </>
   );

@@ -99,3 +99,69 @@ export async function updateLiturgyItemPublic(itemId: string, updateData: any) {
   }
   return { success: true };
 }
+
+/**
+ * Exclui um evento com verificação de permissões do usuário logado:
+ * - Admin: pode excluir qualquer evento
+ * - Criador do evento (created_by): pode excluir o que criou
+ * - Culto: qualquer Ancião pode excluir
+ */
+export async function deleteEventAction(eventId: string) {
+  const { createServerSupabaseClient } = await import('@/lib/supabase/server');
+  const supabase = await createServerSupabaseClient();
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+
+  if (!authUser) {
+    throw new Error('Usuário não autenticado.');
+  }
+
+  // 1. Obter dados do usuário e seus papéis
+  const { data: userData } = await supabaseAdmin
+    .from('users')
+    .select(`
+      id,
+      person_id,
+      user_app_roles(app_roles(name, level))
+    `)
+    .eq('id', authUser.id)
+    .single();
+
+  const roles = userData?.user_app_roles?.map((r: any) => r.app_roles?.name).filter(Boolean) || [];
+  const maxLevel = userData?.user_app_roles?.reduce((max: number, r: any) => Math.max(max, r.app_roles?.level || 0), 0) || 0;
+  const isAdmin = roles.includes('admin') || maxLevel >= 5;
+  const isAnciao = roles.includes('anciao') || maxLevel >= 4;
+
+  // 2. Obter o evento
+  const { data: event, error: eventErr } = await supabaseAdmin
+    .from('events')
+    .select('*, event_type:event_types(name)')
+    .eq('id', eventId)
+    .single();
+
+  if (eventErr || !event) {
+    throw new Error('Evento não encontrado.');
+  }
+
+  const isCulto = event.event_type?.name?.toLowerCase().includes('culto') || event.title?.toLowerCase().includes('culto');
+  const isCreator = (event.created_by && event.created_by === authUser.id) || 
+                    (userData?.person_id && event.responsible_person_id && event.responsible_person_id === userData.person_id);
+
+  const canDelete = isAdmin || isCreator || (isCulto && isAnciao) || maxLevel >= 3;
+
+  if (!canDelete) {
+    throw new Error('Você não tem permissão para excluir este evento.');
+  }
+
+  // 3. Excluir o evento
+  const { error: delErr } = await supabaseAdmin
+    .from('events')
+    .delete()
+    .eq('id', eventId);
+
+  if (delErr) {
+    console.error('deleteEventAction error:', delErr);
+    throw new Error(delErr.message || 'Erro ao excluir o evento.');
+  }
+
+  return { success: true };
+}

@@ -127,12 +127,14 @@ export default function EscalasGrid({ title, icon, eventTypesToInclude, rolesToM
         return;
       }
       
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
       const { error } = await supabase.from('events').insert({
         title: 'Culto (Rascunho)',
         date: dateStr,
         start_time: newDraft.time,
         event_type_id: newDraft.typeId,
         status: 'draft',
+        created_by: currentUser?.id || null
       });
       if (error) throw error;
       addToast({ type: 'success', title: 'Espaço de escala criado!' });

@@ -8,13 +8,15 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import Header from '@/components/layout/Header';
 import PersonSelect from '@/components/ui/PersonSelect';
 import LiturgyEditor from './LiturgyEditor';
+import { canManageEvent } from '@/lib/utils/permissions';
+import { deleteEventAction } from '@/app/actions';
 
 export default function EventoDetalhesPage() {
   const params = useParams();
   const router = useRouter();
   const supabase = createClient();
   const { addToast } = useToast();
-  const { isAdmin, isLeadership } = useAuth();
+  const { user, roles: userRoles, isAdmin, isLeadership } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [event, setEvent] = useState<any>(null);
@@ -140,13 +142,14 @@ export default function EventoDetalhesPage() {
     if (!confirm('TEM CERTEZA que deseja excluir este evento? Esta ação não pode ser desfeita e removerá todas as escalas e liturgias associadas.')) return;
     try {
       setLoading(true);
-      const { error } = await supabase.from('events').delete().eq('id', params.id as string);
-      if (error) throw error;
-      addToast({ type: 'success', title: 'Evento excluído com sucesso!' });
-      router.push('/admin'); // Ou para a página inicial
-    } catch (error) {
+      const res = await deleteEventAction(params.id as string);
+      if (res.success) {
+        addToast({ type: 'success', title: 'Evento excluído com sucesso!' });
+        router.push('/');
+      }
+    } catch (error: any) {
       console.error(error);
-      addToast({ type: 'error', title: 'Erro ao excluir o evento.' });
+      addToast({ type: 'error', title: 'Erro ao excluir o evento.', message: error.message });
       setLoading(false);
     }
   };
@@ -180,13 +183,15 @@ export default function EventoDetalhesPage() {
   if (loading) return <div className="loading-page"><div className="spinner spinner-lg" /></div>;
   if (!event) return null;
 
+  const { canEdit, canDelete } = canManageEvent(event, user, userRoles, isLeadership);
+
   return (
     <>
       <Header title={event.title} onMenuToggle={() => {}}>
-        <button className="btn btn-secondary btn-sm" onClick={() => router.push('/agenda')} style={{ marginRight: '8px' }}>
+        <button className="btn btn-secondary btn-sm" onClick={() => router.push('/')} style={{ marginRight: '8px' }}>
           Voltar
         </button>
-        {(isAdmin || isLeadership) && (
+        {canEdit && (
           <button className="btn btn-secondary btn-sm" onClick={() => router.push(`/eventos/${params.id as string}/editar`)} style={{ marginRight: '8px' }}>
             Editar
           </button>
@@ -273,7 +278,7 @@ export default function EventoDetalhesPage() {
               </div>
             )}
 
-            {(isAdmin || isLeadership) && (
+            {canDelete && (
               <div style={{ marginTop: 'var(--space-8)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-danger)', textAlign: 'right' }}>
                 <button onClick={handleDeleteEvent} className="btn btn-danger">
                   🗑️ Excluir Evento Permanentemente

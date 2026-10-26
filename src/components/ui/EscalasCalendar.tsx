@@ -166,6 +166,7 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
         return;
       }
       
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
       const { error } = await supabase.from('events').insert({
         title: eventType ? `${eventType.name} (Rascunho)` : 'Culto (Rascunho)',
         date: dateStr,
@@ -173,7 +174,8 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
         event_type_id: newDraft.typeId,
         parent_event_id: finalParentId,
         status: 'draft',
-        notes: newDraft.requester ? `Solicitado por: ${newDraft.requester}` : null
+        notes: newDraft.requester ? `Solicitado por: ${newDraft.requester}` : null,
+        created_by: currentUser?.id || null
       });
       if (error) throw error;
       addToast({ type: 'success', title: 'Espaço de escala criado!' });

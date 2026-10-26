@@ -4,16 +4,21 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter, useParams } from 'next/navigation';
 import { useToast } from '@/lib/hooks/useToast';
+import { useAuth } from '@/lib/hooks/useAuth';
 import Header from '@/components/layout/Header';
+import { canManageEvent } from '@/lib/utils/permissions';
+import { deleteEventAction } from '@/app/actions';
 
 export default function EditarEventoPage() {
   const params = useParams();
   const router = useRouter();
   const supabase = createClient();
   const { addToast } = useToast();
+  const { user, roles, isLeadership, isLoading: authLoading } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [eventData, setEventData] = useState<any>(null);
 
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
@@ -23,8 +28,10 @@ export default function EditarEventoPage() {
   const [locations, setLocations] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchData();
-  }, [params.id]);
+    if (!authLoading) {
+      fetchData();
+    }
+  }, [params.id, authLoading]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -32,16 +39,25 @@ export default function EditarEventoPage() {
     // Fetch Event
     const { data: event, error } = await supabase
       .from('events')
-      .select('*')
+      .select('*, event_type:event_types(name)')
       .eq('id', params.id as string)
       .single();
 
     if (error || !event) {
       addToast({ type: 'error', title: 'Evento não encontrado' });
-      router.push('/agenda');
+      router.push('/');
       return;
     }
 
+    // Check permissions
+    const { canEdit } = canManageEvent(event, user, roles, isLeadership);
+    if (!canEdit) {
+      addToast({ type: 'error', title: 'Acesso negado', message: 'Você não tem permissão para editar este evento.' });
+      router.push(`/eventos/${params.id}`);
+      return;
+    }
+
+    setEventData(event);
     setTitle(event.title);
     setDate(event.date);
     setStartTime(event.start_time.substring(0,5));
@@ -83,7 +99,25 @@ export default function EditarEventoPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!confirm('Deseja realmente excluir este evento? Esta ação não pode ser desfeita.')) return;
+    try {
+      setSaving(true);
+      const res = await deleteEventAction(params.id as string);
+      if (res.success) {
+        addToast({ type: 'success', title: 'Evento excluído com sucesso!' });
+        router.push('/');
+      }
+    } catch (err: any) {
+      console.error(err);
+      addToast({ type: 'error', title: 'Erro ao excluir evento', message: err.message });
+      setSaving(false);
+    }
+  };
+
   if (loading) return <div className="loading-page"><div className="spinner" /></div>;
+
+  const { canDelete } = canManageEvent(eventData, user, roles, isLeadership);
 
   return (
     <>
@@ -91,6 +125,11 @@ export default function EditarEventoPage() {
         <button className="btn btn-ghost btn-sm" onClick={() => router.push(`/eventos/${params.id}`)} style={{ marginRight: '8px' }}>
           Cancelar
         </button>
+        {canDelete && (
+          <button className="btn btn-danger btn-sm" onClick={handleDelete} disabled={saving} style={{ marginRight: '8px' }}>
+            🗑️ Excluir Evento
+          </button>
+        )}
         <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
           {saving ? 'Salvando...' : 'Salvar Alterações'}
         </button>
@@ -158,9 +197,17 @@ export default function EditarEventoPage() {
               </select>
             </div>
             
-            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>
+            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-4)' }}>
               * Para alterar Ministérios, Diaconato ou outras necessidades, exclua e crie um novo evento ou fale com um administrador.
             </p>
+
+            {canDelete && (
+              <div style={{ marginTop: 'var(--space-6)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--border-danger)', display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="button" onClick={handleDelete} className="btn btn-danger btn-sm" disabled={saving}>
+                  🗑️ Excluir este evento permanentemente
+                </button>
+              </div>
+            )}
           </form>
         </div>
       </div>

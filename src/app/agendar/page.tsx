@@ -407,6 +407,8 @@ export default function PublicAgendarWizard() {
 
       const personName = solicitanteId === 'outro' ? solicitante.trim() : (people.find(p => p.id === solicitanteId)?.name || solicitante.trim());
 
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+
       const payload = {
         title: title.trim(),
         event_type_id: eventTypeId,
@@ -424,7 +426,8 @@ export default function PublicAgendarWizard() {
         preacher_id: finalPreacherId || null,
         worship_leader_id: finalWorshipLeaderId || null,
         responsible_person_id: solicitanteId === 'outro' ? null : solicitanteId,
-        status: 'scheduled'
+        status: 'scheduled',
+        created_by: currentUser?.id || null
       };
 
       // Verifica se já existe um rascunho de escala para este dia e horário
