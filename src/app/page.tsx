@@ -53,7 +53,7 @@ export default function AgendaPage() {
   }, [roles, selectedMinistry]);
 
   useEffect(() => {
-    if (roles.includes('admin') || roles.includes('anciao')) {
+    if (user) {
       const fetchLookups = async () => {
         const [locs, types] = await Promise.all([
           supabase.from('locations').select('*').eq('is_active', true).order('name'),
@@ -64,7 +64,7 @@ export default function AgendaPage() {
       };
       fetchLookups();
     }
-  }, [roles, supabase]);
+  }, [user, supabase]);
 
   const fetchExtraParticipants = useCallback(async (eventId: string) => {
     const { data: epData } = await supabase
@@ -813,7 +813,20 @@ export default function AgendaPage() {
                     </span>
                   )}
                 </div>
-                <button className="modal-close" onClick={() => setSelectedEvent(null)}>×</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {canDeleteSelectedEvent && (
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      onClick={() => handleDeleteEvent(selectedEvent.id)}
+                      title="Excluir este evento da agenda"
+                      style={{ padding: '4px 10px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      🗑️ Excluir
+                    </button>
+                  )}
+                  <button className="modal-close" onClick={() => setSelectedEvent(null)}>×</button>
+                </div>
               </div>
               <div className="modal-body">
                 <div className="review-grid">
@@ -1083,8 +1096,9 @@ export default function AgendaPage() {
                     {canDeleteSelectedEvent && (
                       <button
                         type="button"
-                        className="btn btn-danger btn-sm"
+                        className="btn btn-danger"
                         onClick={() => handleDeleteEvent(selectedEvent.id)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
                       >
                         🗑️ Excluir Evento
                       </button>
