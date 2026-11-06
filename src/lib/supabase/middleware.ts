@@ -29,10 +29,18 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const user = session?.user;
+  let user = null;
+  try {
+    // Timeout de 2.5s para evitar que lentidão de rede externa cause 504 MIDDLEWARE_INVOCATION_TIMEOUT na Vercel
+    const sessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise<{ data: { session: null } }>((resolve) =>
+      setTimeout(() => resolve({ data: { session: null } }), 2500)
+    );
+    const result = await Promise.race([sessionPromise, timeoutPromise]);
+    user = result?.data?.session?.user || null;
+  } catch (error) {
+    console.error('Erro ao verificar sessão no middleware:', error);
+  }
 
   // Public routes that don't require auth
   // Todas as rotas base são públicas, apenas admin é protegido
