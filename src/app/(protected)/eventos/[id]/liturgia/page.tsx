@@ -25,6 +25,74 @@ interface LocalLiturgyItem {
   list_data?: { singers: string; songs: string[] };
 }
 
+function fixCapitalization(str: string): string {
+  const lowercaseWords = ['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o', 'em'];
+  return str
+    .split(/\s+/)
+    .map((word, idx) => {
+      const lower = word.toLowerCase();
+      if (idx > 0 && lowercaseWords.includes(lower)) {
+        return lower;
+      }
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(' ');
+}
+
+function formatName(name: string): string {
+  if (!name) return '';
+  const trimmed = name.trim();
+
+  // 1. Se tem ' e ' ou ' & ' (casais, duplas, parcerias: ex: "Felipe e Aline", "Jurema e a Soelsi") -> manter completo
+  if (/\s+(e|&)\s+/i.test(trimmed)) {
+    return fixCapitalization(trimmed);
+  }
+
+  // 2. Se for grupo, banda, trio, ministério, coral, equipe, etc. -> manter completo
+  const groupPattern = /^(trio|grupo|banda|quarteto|coral|equipe|minist[eé]rio|conjunto|fam[ií]lia|dupla|jovens|professores|professor|pastores|pastor|anci[aã]os|anci[aã]o|di[aá]conos|diaconisas|desbravadores|aventureiros)\b/i;
+  if (groupPattern.test(trimmed)) {
+    return fixCapitalization(trimmed);
+  }
+
+  const parts = trimmed.split(/\s+/);
+  
+  // 3. Se tiver até 3 palavras (ex: 'Sheila de Matos', 'Darci de Jesus', 'Ana Paula Souza') -> nunca cortar!
+  if (parts.length <= 3) {
+    return fixCapitalization(trimmed);
+  }
+
+  // 4. Se tiver 4 ou mais palavras, mas for curto (até 26 caracteres), mantém inteiro
+  if (trimmed.length <= 26) {
+    return fixCapitalization(trimmed);
+  }
+
+  const prepositions = ['de', 'da', 'do', 'das', 'dos', 'e'];
+  const firstName = parts[0];
+  const secondName = parts[1];
+  
+  // Nome composto tradicional (ex: João Pedro, Ana Paula, Maria Eduarda)
+  const compoundFirst = ['pedro', 'paulo', 'maria', 'eduarda', 'clara', 'paula', 'luiza', 'luiz', 'lucas', 'vitor', 'victor', 'felipe', 'gabriel', 'henrique', 'guilherme', 'arthur', 'miguel', 'alice', 'beatriz', 'sophia', 'laura', 'valentina'];
+  const hasCompound = compoundFirst.includes(secondName.toLowerCase()) && !prepositions.includes(secondName.toLowerCase());
+
+  const prefix = hasCompound ? `${firstName} ${secondName}` : firstName;
+
+  const lastIndex = parts.length - 1;
+  const lastWord = parts[lastIndex];
+  const secondToLast = parts[lastIndex - 1];
+
+  let suffix = lastWord;
+  // Se antes do último houver preposição (ex: 'dos Santos', 'de Matos'), preserva junto
+  if (secondToLast && prepositions.includes(secondToLast.toLowerCase())) {
+    suffix = `${secondToLast} ${lastWord}`;
+  }
+
+  if (prefix.toLowerCase().includes(lastWord.toLowerCase())) {
+    return fixCapitalization(prefix);
+  }
+
+  return fixCapitalization(`${prefix} ${suffix}`);
+}
+
 export default function LiturgyBuilderPage() {
   const params = useParams();
   const eventId = params.id as string;
@@ -593,8 +661,8 @@ export default function LiturgyBuilderPage() {
         else emoji = '🔸';
       }
       
-      const firstName = item.person_name ? item.person_name.split(' ')[0] : '';
-      let personStr = firstName ? ` (${firstName})` : '';
+      const formattedPerson = item.person_name ? formatName(item.person_name) : '';
+      let personStr = formattedPerson ? ` (${formattedPerson})` : '';
       
       let notesStr = '';
       if (item.is_list && item.list_data) {
@@ -655,12 +723,6 @@ export default function LiturgyBuilderPage() {
     );
   }
 
-  const formatName = (name: string) => {
-    if (!name) return '';
-    const parts = name.trim().split(' ');
-    if (parts.length <= 2) return name;
-    return `${parts[0]} ${parts[1]}`;
-  };
 
   const isTwoColumns = items.length > 10;
 
