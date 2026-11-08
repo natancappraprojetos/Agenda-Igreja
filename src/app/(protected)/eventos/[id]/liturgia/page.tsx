@@ -307,10 +307,10 @@ export default function LiturgyBuilderPage() {
     if (isEvangelistico) {
       initialItems = [
         { emoji: '👋', title: 'Abertura e Boas-Vindas', duration: 3, person: ev.responsible_person },
-        { emoji: '🎼', title: 'Hino Inicial', duration: 4, person: ev.worship_leader },
+        { emoji: '🎼', title: 'Momento de Louvor', duration: 8, person: ev.worship_leader, is_list: true },
         { emoji: '🙏', title: 'Oração Inicial', duration: 5, person: null },
         { emoji: '🎁', title: 'Sorteio', duration: 5, person: null },
-        { emoji: '🎼', title: 'Hino Congregacional', duration: 5, person: ev.worship_leader },
+        { emoji: '🎼', title: 'Louvor Inicial', duration: 4, person: ev.worship_leader },
         { emoji: '🎤', title: 'Música Especial', duration: 5, person: findPerson(['Solo', 'Cantor']) },
         { emoji: '📖', title: 'Pregação', duration: 30, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
         { emoji: '🎤', title: 'Música Especial (Apelo)', duration: 5, person: findPerson(['Solo', 'Cantor']) },
