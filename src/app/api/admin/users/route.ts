@@ -6,7 +6,7 @@ import { cookies } from 'next/headers';
 export async function POST(request: Request) {
   try {
     const cookieStore = await cookies();
-    
+
     // Create standard client to verify the caller's auth
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     // 2. Upsert into `users`
     const { error: userError } = await supabaseAdmin
       .from('users')
-      .upsert({ 
+      .upsert({
         id: userId,
         person_id: personId || null
       });
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
       const { error: roleError } = await supabaseAdmin
         .from('user_app_roles')
         .insert(toInsert);
-      
+
       if (roleError) console.error('Error assigning roles:', roleError);
     }
 
