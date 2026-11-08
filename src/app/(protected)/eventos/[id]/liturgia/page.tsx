@@ -93,6 +93,11 @@ function formatName(name: string): string {
   return fixCapitalization(`${prefix} ${suffix}`);
 }
 
+function isCongregationalPraise(title: string): boolean {
+  const t = (title || '').toLowerCase();
+  return t.includes('congregaciona') || t.includes('momento de louvor') || t.includes('cânticos') || t.includes('canticos');
+}
+
 export default function LiturgyBuilderPage() {
   const params = useParams();
   const eventId = params.id as string;
@@ -195,22 +200,25 @@ export default function LiturgyBuilderPage() {
             }
 
             let isList = false;
-            let listData = { singers: '', songs: ['', '', ''] };
+            let listData = { singers: '', songs: ['', ''] };
             let textNotes = i.notes || '';
-            
-            // Force list mode for Louvor items
-            const isLouvorGroup = t.includes('louvor') && !t.includes('especial');
             
             if (textNotes.trim().startsWith('{') && textNotes.trim().endsWith('}')) {
               try {
                 const parsed = JSON.parse(textNotes);
                 if (parsed.songs && Array.isArray(parsed.songs)) {
-                  listData = parsed;
+                  listData = {
+                    singers: parsed.singers || '',
+                    songs: parsed.songs.length > 0 ? parsed.songs : ['', '']
+                  };
+                  isList = true;
                 }
               } catch(e) {}
+            } else if (isCongregationalPraise(t)) {
+              isList = true;
             }
             
-            if (isLouvorGroup && (!listData.singers || listData.singers === '')) {
+            if (isList && (!listData.singers || listData.singers === '')) {
                const leaderNameFull = findPeopleNames(['Líder de Louvor', 'Música']) || evData.worship_leader?.name;
                const leaderName = leaderNameFull ? leaderNameFull.split(' ')[0] : null;
                
@@ -225,9 +233,8 @@ export default function LiturgyBuilderPage() {
                if (leaderName) parts.push(`Responsável: ${leaderName}`);
                if (teamNames) parts.push(`Equipe: ${teamNames}`);
                listData.singers = parts.join(' | ');
-            } else if (t.includes('louvor especial') && (!pId || pId === evData.worship_leader_id)) {
-               // Try to pull Cantor Solo if not explicitly set to someone else
-               const solo = findPerson(['Solo']);
+            } else if ((t.includes('louvor especial') || t.includes('música especial') || t.includes('solo')) && (!pId || pId === evData.worship_leader_id)) {
+               const solo = findPerson(['Solo', 'Cantor']);
                if (solo) {
                   pId = solo.id;
                   pName = solo.name;
@@ -239,10 +246,10 @@ export default function LiturgyBuilderPage() {
               title: i.title,
               duration_minutes: i.duration_minutes,
               order_index: i.order_index,
-              person_id: pId,
-              person_name: pName,
-              notes: isLouvorGroup ? '' : textNotes,
-              is_list: isLouvorGroup,
+              person_id: isList ? null : pId,
+              person_name: isList ? '' : pName,
+              notes: isList ? '' : textNotes,
+              is_list: isList,
               list_data: listData,
               calculated_time: i.calculated_time
             };
@@ -268,14 +275,22 @@ export default function LiturgyBuilderPage() {
     fetchData();
   }, [fetchData]);
 
-  const generateTemplate = async (ev: any, existingLiturgyId?: string) => {
+  const generateTemplate = async (ev: any, existingLiturgyId?: string, forcedTemplateType?: string) => {
     const title = (ev.title || '').toLowerCase();
     const date = new Date(ev.date + 'T00:00:00');
     const dayOfWeek = date.getDay(); 
     
-    let isSabado = title.includes('sáb') || title.includes('sabado') || dayOfWeek === 6;
-    let isQuarta = title.includes('quarta') || dayOfWeek === 3;
-    let isDomingo = title.includes('domingo') || dayOfWeek === 0;
+    let isEvangelistico = forcedTemplateType === 'evangelistico' || 
+      (!forcedTemplateType && (title.includes('evang') || title.includes('esperança') || title.includes('esperanca') || title.includes('semana') || title.includes('conferência') || title.includes('conferencia')));
+    
+    let isSantaCeia = forcedTemplateType === 'santaceia' ||
+      (!forcedTemplateType && !isEvangelistico && (title.includes('santa ceia') || title.includes('ceia')));
+
+    let isSabado = forcedTemplateType === 'sabado' || 
+      (!forcedTemplateType && !isEvangelistico && !isSantaCeia && (title.includes('sáb') || title.includes('sabado') || dayOfWeek === 6));
+
+    let isQuarta = forcedTemplateType === 'quarta' ||
+      (!forcedTemplateType && !isEvangelistico && !isSantaCeia && (title.includes('quarta') || dayOfWeek === 3));
 
     let initialItems: any[] = [];
     
@@ -289,7 +304,20 @@ export default function LiturgyBuilderPage() {
       return null;
     };
 
-    if (isSabado) {
+    if (isEvangelistico) {
+      initialItems = [
+        { emoji: '👋', title: 'Abertura e Boas-Vindas', duration: 3, person: ev.responsible_person },
+        { emoji: '🎼', title: 'Hino Inicial', duration: 4, person: ev.worship_leader },
+        { emoji: '🙏', title: 'Oração Inicial', duration: 5, person: null },
+        { emoji: '🎁', title: 'Sorteio', duration: 5, person: null },
+        { emoji: '🎼', title: 'Hino Congregacional', duration: 5, person: ev.worship_leader },
+        { emoji: '🎤', title: 'Música Especial', duration: 5, person: findPerson(['Solo', 'Cantor']) },
+        { emoji: '📖', title: 'Pregação', duration: 30, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
+        { emoji: '🎤', title: 'Música Especial (Apelo)', duration: 5, person: findPerson(['Solo', 'Cantor']) },
+        { emoji: '🙏', title: 'Oração Final', duration: 3, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
+        { emoji: '🤝', title: 'Confraternização / Lanche', duration: 5, person: null },
+      ];
+    } else if (isSantaCeia) {
       initialItems = [
         { emoji: '📘', title: 'Abertura da Escola Sabatina', duration: 10, person: findPerson(['Sabatina']) },
         { emoji: '🎼', title: 'Hino Inicial', duration: 3, person: null },
@@ -297,39 +325,59 @@ export default function LiturgyBuilderPage() {
         { emoji: '🌍', title: 'Informativo Mundial das Missões', duration: 7, person: null },
         { emoji: '📘', title: 'Estudo da Lição nas Classes', duration: 30, person: { name: 'Professores' } },
         { emoji: '💼', title: 'Pastoreio nas Classes', duration: 10, person: { name: 'Professores' } },
-        { emoji: '🎼', title: 'Louvor Especial', duration: 5, person: findPerson(['Solo']) || ev.worship_leader },
+        { emoji: '📣', title: 'Anúncios', duration: 5, person: findPerson(['Anúncios', 'Responsável']) || ev.responsible_person },
+        { emoji: '👨‍👩‍👧‍👦', title: 'Momento da Família', duration: 5, person: null },
+        { emoji: '💰', title: 'Momento de Fidelidade (Dízimos e Ofertas)', duration: 10, person: findPerson(['Oferta']) },
+        { emoji: '🎼', title: 'Louvores Congregacionais', duration: 10, person: ev.worship_leader, is_list: true },
+        { emoji: '🙏', title: 'Oração Inicial (de joelhos)', duration: 5, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
+        { emoji: '🎤', title: 'Louvor Especial (Solo)', duration: 5, person: findPerson(['Solo', 'Cantor']) },
+        { emoji: '📖', title: 'Sermão da Santa Ceia', duration: 30, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
+        { emoji: '🍞', title: 'Cerimônia de Lava-Pés e Santa Ceia', duration: 25, person: ev.responsible_person },
+        { emoji: '🎼', title: 'Louvor Final', duration: 5, person: findPerson(['Solo', 'Cantor']) || ev.worship_leader },
+        { emoji: '🙏', title: 'Oração Final', duration: 3, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
+      ];
+    } else if (isSabado) {
+      initialItems = [
+        { emoji: '📘', title: 'Abertura da Escola Sabatina', duration: 10, person: findPerson(['Sabatina']) },
+        { emoji: '🎼', title: 'Hino Inicial', duration: 3, person: null },
+        { emoji: '🙏', title: 'Oração de Joelhos', duration: 2, person: null },
+        { emoji: '🌍', title: 'Informativo Mundial das Missões', duration: 7, person: null },
+        { emoji: '📘', title: 'Estudo da Lição nas Classes', duration: 30, person: { name: 'Professores' } },
+        { emoji: '💼', title: 'Pastoreio nas Classes', duration: 10, person: { name: 'Professores' } },
+        { emoji: '🎼', title: 'Louvor Especial', duration: 5, person: findPerson(['Solo', 'Cantor']) || ev.worship_leader },
         { emoji: '📣', title: 'Anúncios', duration: 5, person: findPerson(['Anúncios', 'Responsável']) || ev.responsible_person },
         { emoji: '👨‍👩‍👧‍👦', title: 'Momento da Família', duration: 5, person: null },
         { emoji: '🧸', title: 'História das crianças', duration: 5, person: findPerson(['História', 'Criança']) },
         { emoji: '💰', title: 'Provai e Vede + Ofertas', duration: 10, person: findPerson(['Oferta']) },
-        { emoji: '🎼', title: 'Louvores Congregacionais', duration: 10, person: ev.worship_leader },
-        { emoji: '🎤', title: 'Mensagem Musical', duration: 5, person: findPerson(['Solo']) || ev.worship_leader },
+        { emoji: '🎼', title: 'Louvores Congregacionais', duration: 10, person: ev.worship_leader, is_list: true },
+        { emoji: '🎤', title: 'Mensagem Musical', duration: 5, person: findPerson(['Solo', 'Cantor']) || ev.worship_leader },
         { emoji: '🙏', title: 'Oração Inicial (de joelhos)', duration: 5, person: null },
-        { emoji: '🎼', title: 'Louvor Especial', duration: 5, person: findPerson(['Solo']) || ev.worship_leader },
         { emoji: '📖', title: 'Sermão', duration: 35, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
-        { emoji: '🎼', title: 'Louvor Especial', duration: 5, person: findPerson(['Solo']) || ev.worship_leader },
+        { emoji: '🎼', title: 'Louvor Final', duration: 5, person: findPerson(['Solo', 'Cantor']) || ev.worship_leader },
         { emoji: '🙏', title: 'Oração Final', duration: 3, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
       ];
     } else if (isQuarta) {
       initialItems = [
-        { emoji: '🎼', title: 'Louvor', duration: 5, person: ev.worship_leader },
+        { emoji: '🎼', title: 'Momento de Louvor', duration: 5, person: ev.worship_leader, is_list: true },
         { emoji: '🙏', title: 'Oração Inicial', duration: 5, person: null },
         { emoji: '🙏', title: 'Pedidos e agradecimentos', duration: 15, person: null },
         { emoji: '💰', title: 'Momento Fidelidade / Ofertas', duration: 5, person: findPerson(['Oferta']) },
         { emoji: '🎼', title: 'Louvor Inicial', duration: 4, person: ev.worship_leader },
         { emoji: '📖', title: 'Pregação', duration: 30, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
-        { emoji: '🎼', title: 'Louvor final', duration: 3, person: ev.worship_leader },
+        { emoji: '🎼', title: 'Louvor Final', duration: 3, person: ev.worship_leader },
         { emoji: '🙏', title: 'Oração Final', duration: 3, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
       ];
     } else {
       // Domingo ou Padrão
       initialItems = [
-        { emoji: '🎼', title: 'Louvor', duration: 5, person: ev.worship_leader },
+        { emoji: '👋', title: 'Abertura e Boas-Vindas', duration: 3, person: ev.responsible_person },
+        { emoji: '🎼', title: 'Momento de Louvor', duration: 8, person: ev.worship_leader, is_list: true },
         { emoji: '🙏', title: 'Oração Inicial', duration: 5, person: null },
         { emoji: '💰', title: 'Momento Fidelidade / Ofertas', duration: 5, person: findPerson(['Oferta']) },
-        { emoji: '🎼', title: 'Louvor Inicial', duration: 5, person: ev.worship_leader },
+        { emoji: '🎼', title: 'Louvor Inicial', duration: 4, person: ev.worship_leader },
+        { emoji: '🎤', title: 'Música Especial', duration: 5, person: findPerson(['Solo', 'Cantor']) },
         { emoji: '📖', title: 'Pregação', duration: 30, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
-        { emoji: '🎼', title: 'Louvor final', duration: 5, person: ev.worship_leader },
+        { emoji: '🎼', title: 'Louvor Final', duration: 4, person: ev.worship_leader },
         { emoji: '🙏', title: 'Oração Final', duration: 3, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
       ];
     }
@@ -470,11 +518,10 @@ export default function LiturgyBuilderPage() {
     }
 
     const newItems: LocalLiturgyItem[] = initialItems.map((item, idx) => {
-      const t = (item.title || '').toLowerCase();
-      const isLouvorGroup = t.includes('louvor') && !t.includes('especial');
+      const isList = Boolean(item.is_list);
       
       let singersStr = '';
-      if (isLouvorGroup) {
+      if (isList) {
          const leaderNameFull = findPeopleNames(['Líder de Louvor', 'Música']) || ev.worship_leader?.name;
          const leaderName = leaderNameFull ? leaderNameFull.split(' ')[0] : null;
          
@@ -495,12 +542,12 @@ export default function LiturgyBuilderPage() {
         title: item.title,
         duration_minutes: item.duration,
         order_index: idx + 1,
-        person_id: isLouvorGroup ? null : (item.person?.id || null),
-        person_name: isLouvorGroup ? '' : (item.person?.name || ''),
+        person_id: isList ? null : (item.person?.id || null),
+        person_name: isList ? '' : (item.person?.name || ''),
         emoji: item.emoji,
         notes: '',
-        is_list: isLouvorGroup,
-        list_data: isLouvorGroup ? { singers: singersStr, songs: ['', '', ''] } : { singers: '', songs: [''] }
+        is_list: isList,
+        list_data: isList ? { singers: singersStr, songs: ['', ''] } : { singers: '', songs: [''] }
       };
     });
 
@@ -539,17 +586,42 @@ export default function LiturgyBuilderPage() {
     }
   };
 
+  const handleToggleListMode = (index: number) => {
+    const newItems = [...items];
+    const current = newItems[index];
+    const nextIsList = !current.is_list;
+    newItems[index] = {
+      ...current,
+      is_list: nextIsList,
+      list_data: nextIsList 
+        ? (current.list_data?.songs?.length ? current.list_data : { singers: current.person_name || '', songs: ['', ''] })
+        : current.list_data
+    };
+    setItems(newItems);
+  };
+
+  const handleApplyTemplate = async (templateKey: string) => {
+    if (items.length > 0) {
+      if (!confirm('Deseja carregar este modelo? A lista de itens atual deste culto será substituída pelos itens do modelo selecionado.')) {
+        return;
+      }
+    }
+    await generateTemplate(event, liturgyId || undefined, templateKey);
+    addToast({ type: 'success', title: 'Modelo aplicado com sucesso!' });
+  };
+
   const handleUpdateItem = (index: number, field: keyof LocalLiturgyItem, value: any, extraPersonName?: string) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
     
-    // Auto toggle list mode based on title
+    // Auto toggle list mode based on title only if it's explicitly congregational praise
     if (field === 'title') {
       const t = (value || '').toLowerCase();
-      const isLouvorGroup = t.includes('louvor') && !t.includes('especial');
-      newItems[index].is_list = isLouvorGroup;
-      if (isLouvorGroup && !newItems[index].list_data) {
-        newItems[index].list_data = { singers: '', songs: ['', '', ''] };
+      if (isCongregationalPraise(t)) {
+        newItems[index].is_list = true;
+        if (!newItems[index].list_data || !newItems[index].list_data?.songs?.length) {
+          newItems[index].list_data = { singers: '', songs: ['', ''] };
+        }
       }
     }
 
@@ -653,11 +725,16 @@ export default function LiturgyBuilderPage() {
       if (!emoji) {
         const titleLower = (item.title || '').toLowerCase();
         if (titleLower.includes('oração') || titleLower.includes('orar')) emoji = '🙏';
-        else if (titleLower.includes('louvor') || titleLower.includes('hino') || titleLower.includes('cantar')) emoji = '🎼';
+        else if (titleLower.includes('sorteio')) emoji = '🎁';
+        else if (titleLower.includes('confraternização') || titleLower.includes('lanche')) emoji = '🤝';
+        else if (titleLower.includes('abertura') || titleLower.includes('boas-vindas') || titleLower.includes('boas vindas')) emoji = '👋';
+        else if (titleLower.includes('louvor') || titleLower.includes('hino') || titleLower.includes('música') || titleLower.includes('cantar')) emoji = '🎼';
         else if (titleLower.includes('sermão') || titleLower.includes('pregação') || titleLower.includes('mensagem')) emoji = '📖';
-        else if (titleLower.includes('oferta') || titleLower.includes('dízimo')) emoji = '💰';
+        else if (titleLower.includes('oferta') || titleLower.includes('dízimo') || titleLower.includes('fidelidade')) emoji = '💰';
         else if (titleLower.includes('anúncio')) emoji = '📣';
         else if (titleLower.includes('história') || titleLower.includes('criança')) emoji = '🧸';
+        else if (titleLower.includes('ceia') || titleLower.includes('lava-pés')) emoji = '🍞';
+        else if (titleLower.includes('batismo')) emoji = '💧';
         else emoji = '🔸';
       }
       
@@ -754,6 +831,60 @@ export default function LiturgyBuilderPage() {
           <p style={{ margin: 0, opacity: 0.9 }}>{formatDateShort(event.date)} • {formatTime(event.start_time)}</p>
         </div>
 
+        {/* Seletor Rápido de Modelos */}
+        <div className="card mb-4" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#475569' }}>📋 Carregar Modelo:</span>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button 
+                type="button" 
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: '0.8rem', padding: '4px 10px', backgroundColor: '#ffffff' }}
+                onClick={() => handleApplyTemplate('evangelistico')}
+                title="Modelo de Culto Evangelístico (sem ofertas, com sorteio e louvores pontuais)"
+              >
+                ✨ Culto Evangelístico
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: '0.8rem', padding: '4px 10px', backgroundColor: '#ffffff' }}
+                onClick={() => handleApplyTemplate('santaceia')}
+                title="Modelo de Santa Ceia no Sábado (lava-pés, fidelidade e solo)"
+              >
+                🍞 Santa Ceia (Sábado)
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: '0.8rem', padding: '4px 10px', backgroundColor: '#ffffff' }}
+                onClick={() => handleApplyTemplate('sabado')}
+                title="Culto tradicional de Sábado de manhã"
+              >
+                ⛪ Sábado Normal
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: '0.8rem', padding: '4px 10px', backgroundColor: '#ffffff' }}
+                onClick={() => handleApplyTemplate('quarta')}
+                title="Culto de Oração de Quarta-feira"
+              >
+                🙏 Quarta-feira
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: '0.8rem', padding: '4px 10px', backgroundColor: '#ffffff' }}
+                onClick={() => handleApplyTemplate('domingo')}
+                title="Culto de Domingo à noite normal"
+              >
+                🕊️ Domingo Normal
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="liturgy-builder" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {items.map((item, idx) => (
             <div key={idx} className="card" style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start', padding: 'var(--space-3)' }}>
@@ -804,6 +935,22 @@ export default function LiturgyBuilderPage() {
                     />
                     <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>min</span>
                   </div>
+                </div>
+
+                {/* Alternador de Modo: Individual vs Lista de Hinos */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '2px 0' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    {item.is_list ? '🎤 Modo: Equipe de Louvor (Lista de Hinos)' : '👤 Modo: Pessoa / Cantor Individual'}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ fontSize: '0.72rem', padding: '2px 6px', color: 'var(--primary)', height: 'auto', minHeight: 'auto' }}
+                    onClick={() => handleToggleListMode(idx)}
+                    title="Alternar entre modo Cantor Individual ou Lista de Hinos"
+                  >
+                    {item.is_list ? '👤 Mudar para Cantor Individual' : '🎤 Mudar para Lista de Hinos'}
+                  </button>
                 </div>
 
                 {!item.is_list && (
@@ -876,7 +1023,7 @@ export default function LiturgyBuilderPage() {
                     </div>
 
                     <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
-                      Hinos
+                      Hinos (normalmente 2 hinos):
                     </label>
                     {(item.list_data?.songs || []).map((song, sIdx) => (
                       <div key={sIdx} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
@@ -884,16 +1031,16 @@ export default function LiturgyBuilderPage() {
                           <input 
                             type="text" 
                             className="form-input form-input-sm" 
-                            placeholder="Ex: Vem Espírito Santo (585 NHA)" 
+                            placeholder={`Hino ${sIdx + 1} (ex: Vem Espírito Santo - 585 NHA)`} 
                             value={song} 
                             onChange={e => handleUpdateListSong(idx, sIdx, e.target.value)}
                             style={{ fontSize: '0.85rem' }}
                           />
                         </div>
-                        <button className="btn btn-ghost btn-sm" style={{ padding: '4px', color: 'var(--text-danger)' }} onClick={() => handleRemoveListSong(idx, sIdx)}>✖</button>
+                        <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px', color: 'var(--text-danger)' }} onClick={() => handleRemoveListSong(idx, sIdx)} title="Remover este hino">✖</button>
                       </div>
                     ))}
-                    <button className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start', fontSize: '0.8rem', color: 'var(--primary)' }} onClick={() => handleAddListSong(idx)}>
+                    <button type="button" className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start', fontSize: '0.8rem', color: 'var(--primary)' }} onClick={() => handleAddListSong(idx)}>
                       + Adicionar Hino
                     </button>
                   </div>
@@ -976,11 +1123,11 @@ export default function LiturgyBuilderPage() {
                  <div style={{ flex: 1 }}>
                    <div style={{ fontWeight: 'bold', fontSize: '17px', color: '#0f172a' }}>{item.title}</div>
                    
-                   {item.is_list && item.list_data && item.list_data.songs && item.list_data.songs.length > 0 ? (
+                   {item.is_list && item.list_data && item.list_data.songs && (item.list_data.songs.some(s => s && s.trim()) || item.list_data.singers) ? (
                      <div style={{ marginTop: '6px', background: '#ffffff', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                        <div style={{ fontSize: '13px', color: '#475569', fontWeight: 700, marginBottom: '2px' }}>🎤 {item.list_data.singers || 'Equipe'}:</div>
                        <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#334155' }}>
-                         {item.list_data.songs.map((song, i) => (
+                         {item.list_data.songs.filter(s => s && s.trim()).map((song, i) => (
                            <li key={i} style={{ marginBottom: '2px' }}>{song}</li>
                          ))}
                        </ul>
