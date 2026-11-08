@@ -40,8 +40,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { person, roles, isAdmin, isLeadership, isLoading, signOut } = useAuth();
   const notificationsData = useUnreadNotificationsCount();
   
-  const isStrictLeader = roles.some(r => ['musica', 'sonoplastia', 'diacono'].includes(r));
-  const hasTeam = roles.some(r => ['musica', 'sonoplastia', 'diacono', 'anciao'].includes(r));
+  const isStrictLeader = roles.some(r => ['musica', 'sonoplastia', 'diacono', 'escola_sabatina'].includes(r));
+  const hasTeam = roles.some(r => ['musica', 'sonoplastia', 'diacono', 'escola_sabatina', 'anciao'].includes(r));
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
@@ -49,12 +49,21 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   };
 
   const getRoleLabel = () => {
-    if (roles.includes('admin')) return 'Administrador';
-    if (roles.includes('anciao')) return 'Ancião / Liderança';
-    if (roles.includes('diacono')) return 'Líder do Diaconato';
-    if (roles.includes('musica')) return 'Líder de Música';
-    if (roles.includes('sonoplastia')) return 'Líder de Sonoplastia';
-    return 'Membro';
+    const list: string[] = [];
+    if (roles.includes('admin')) list.push('Admin');
+    if (roles.includes('anciao')) list.push('Ancião');
+    if (roles.includes('diacono')) list.push('Diaconato');
+    if (roles.includes('musica')) list.push('Música');
+    if (roles.includes('sonoplastia')) list.push('Sonoplastia');
+    if (roles.includes('escola_sabatina')) list.push('Escola Sabatina');
+
+    if (list.length === 0) return 'Membro';
+    if (list.length === 1) {
+      if (list[0] === 'Admin') return 'Administrador';
+      if (list[0] === 'Ancião') return 'Ancião / Liderança';
+      return `Líder: ${list[0]}`;
+    }
+    return list.join(' • ');
   };
 
   const getInitials = (name: string) => {

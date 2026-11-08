@@ -40,13 +40,13 @@ export default function AgendaPage() {
   const { user, isLeadership, roles } = useAuth();
   const { addToast } = useToast();
   
-  const hasTeam = roles.some(r => (['musica', 'sonoplastia', 'diacono', 'anciao', 'admin'] as AppRoleName[]).includes(r));
+  const hasTeam = roles.some(r => (['musica', 'sonoplastia', 'diacono', 'anciao', 'admin', 'escola_sabatina'] as AppRoleName[]).includes(r));
 
   useEffect(() => {
     if (!selectedMinistry && roles.length > 0) {
       if (roles.includes('admin')) setSelectedMinistry('anciao');
       else {
-        const available = (['anciao', 'musica', 'sonoplastia', 'diacono'] as AppRoleName[]).find(r => roles.includes(r));
+        const available = (['anciao', 'musica', 'sonoplastia', 'diacono', 'escola_sabatina'] as AppRoleName[]).find(r => roles.includes(r));
         if (available) setSelectedMinistry(available);
       }
     }
@@ -465,6 +465,9 @@ export default function AgendaPage() {
     } else if (selectedMinistry === 'diacono') {
       filteredEvents = events.filter(e => e.event_type?.name?.toLowerCase().includes('culto'));
       columns.push('Recolher Ofertas/Dízimos');
+    } else if (selectedMinistry === 'escola_sabatina') {
+      filteredEvents = events.filter(e => e.event_type?.name?.toLowerCase().includes('culto') || e.event_type?.name?.toLowerCase().includes('sabatina'));
+      columns.push('Escola Sabatina / Professores');
     }
 
     const renderMinistryCalendarGrid = (monthDate: Date, isTrimester: boolean, monthIndex: number = 0) => {
@@ -497,6 +500,7 @@ export default function AgendaPage() {
                                 if (selectedMinistry === 'sonoplastia') return e.needs_sound || e.event_type?.name?.toLowerCase().includes('culto');
                                 if (selectedMinistry === 'musica') return e.event_type?.name?.toLowerCase().includes('culto');
                                 if (selectedMinistry === 'diacono') return e.event_type?.name?.toLowerCase().includes('culto');
+                                if (selectedMinistry === 'escola_sabatina') return e.event_type?.name?.toLowerCase().includes('culto') || e.event_type?.name?.toLowerCase().includes('sabatina');
                                 return true;
                             });
                             cellEvents = [...cellEvents, ...evs];
@@ -542,8 +546,11 @@ export default function AgendaPage() {
                                        const nameSolo = soloRoles.map(r => r.person?.name).filter(Boolean).join(', ');
                                        if (nameSolo) subText = nameSolo;
                                      } else if (selectedMinistry === 'diacono') {
-                                       const dRoles = ev.participants?.filter(p => p.role?.name?.toLowerCase().includes('diácono') || p.role?.name?.toLowerCase().includes('oferta')) || [];
+                                       const dRoles = ev.participants?.filter(p => p.role?.name?.toLowerCase().includes('diácono') || p.role?.name?.toLowerCase().includes('diacon') || p.role?.name?.toLowerCase().includes('oferta')) || [];
                                        text = dRoles.map(r => r.person?.name).filter(Boolean).join(', ') || 'A Definir';
+                                     } else if (selectedMinistry === 'escola_sabatina') {
+                                       const esRoles = ev.participants?.filter(p => p.role?.name?.toLowerCase().includes('sabatina') || p.role?.name?.toLowerCase().includes('professor') || p.role?.name?.toLowerCase().includes('diretor')) || [];
+                                       text = esRoles.map(r => r.person?.name).filter(Boolean).join(', ') || 'A Definir';
                                      }
 
                                     return (
@@ -621,6 +628,7 @@ export default function AgendaPage() {
               {(roles.includes('admin') || roles.includes('musica')) && <option value="musica">Música</option>}
               {(roles.includes('admin') || roles.includes('sonoplastia')) && <option value="sonoplastia">Sonoplastia</option>}
               {(roles.includes('admin') || roles.includes('diacono')) && <option value="diacono">Diaconato</option>}
+              {(roles.includes('admin') || roles.includes('escola_sabatina')) && <option value="escola_sabatina">Escola Sabatina</option>}
             </select>
           )}
 
@@ -660,7 +668,8 @@ export default function AgendaPage() {
               Agenda Específica - {
                 selectedMinistry === 'anciao' ? 'Pregadores' :
                 selectedMinistry === 'musica' ? 'Ministério da Música' :
-                selectedMinistry === 'sonoplastia' ? 'Sonoplastia' : 'Diaconato'
+                selectedMinistry === 'sonoplastia' ? 'Sonoplastia' :
+                selectedMinistry === 'escola_sabatina' ? 'Escola Sabatina' : 'Diaconato'
               }
             </h2>
             <p style={{ fontSize: '1.1rem', color: '#555' }}>
@@ -725,6 +734,7 @@ export default function AgendaPage() {
                 📋 {selectedMinistry === 'anciao' ? 'Agenda Ancionato' : 
                     selectedMinistry === 'sonoplastia' ? 'Agenda Sonoplastia' :
                     selectedMinistry === 'musica' ? 'Agenda Música' :
+                    selectedMinistry === 'escola_sabatina' ? 'Agenda Escola Sabatina' :
                     selectedMinistry === 'diacono' ? 'Agenda Diaconato' : 'Agenda Específica'}
              </button>
           </div>

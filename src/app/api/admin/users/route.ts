@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     // but ideally we check if the caller has the 'admin' app_role.
 
     const body = await request.json();
-    const { email, password, name, appRoleId, personId, ministryId } = body;
+    const { email, password, name, appRoleId, appRoleIds, personId, ministryId } = body;
 
     if (!email || !password || !name) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -54,12 +54,7 @@ export async function POST(request: Request) {
 
     const userId = authData.user.id;
 
-    // 2. The database trigger `on_auth_user_created` in Supabase might already create 
-    // the row in `public.users`. Let's check if it exists or insert it.
-    // Wait, do we have a trigger? Let's assume we don't have a trigger that auto-inserts,
-    // or if we do, we just update it.
-    
-    // Upsert into `users`
+    // 2. Upsert into `users`
     const { error: userError } = await supabaseAdmin
       .from('users')
       .upsert({ 
@@ -69,19 +64,23 @@ export async function POST(request: Request) {
 
     if (userError) {
       console.error('Error upserting user:', userError);
-      // Not a fatal error if trigger already created it, but good to ensure
     }
 
-    // 3. Assign Role
-    if (appRoleId) {
+    // 3. Assign Roles (support multiple roles)
+    const roleIds: string[] = Array.isArray(appRoleIds)
+      ? appRoleIds.filter(Boolean)
+      : (appRoleId ? [appRoleId] : []);
+
+    if (roleIds.length > 0) {
+      const toInsert = roleIds.map(rId => ({
+        user_id: userId,
+        app_role_id: rId
+      }));
       const { error: roleError } = await supabaseAdmin
         .from('user_app_roles')
-        .insert({
-          user_id: userId,
-          app_role_id: appRoleId
-        });
+        .insert(toInsert);
       
-      if (roleError) console.error('Error assigning role:', roleError);
+      if (roleError) console.error('Error assigning roles:', roleError);
     }
 
     // 4. (Optional) If we want to store which ministry this user manages, 

@@ -24,7 +24,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { email, password, name, appRoleId } = body;
+    const { email, password, name, appRoleId, appRoleIds } = body;
 
     // 1. Update Auth User
     const updateData: any = {};
@@ -37,20 +37,25 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       if (authError) return NextResponse.json({ error: authError.message }, { status: 400 });
     }
 
-    // 2. Update Role
-    // First, delete existing role
+    // 2. Update Roles (support multiple roles)
+    // First, delete existing roles
     await supabaseAdmin.from('user_app_roles').delete().eq('user_id', id);
     
-    // Then insert new role if provided
-    if (appRoleId) {
+    // Then insert new roles if provided
+    const roleIds: string[] = Array.isArray(appRoleIds)
+      ? appRoleIds.filter(Boolean)
+      : (appRoleId ? [appRoleId] : []);
+
+    if (roleIds.length > 0) {
+      const toInsert = roleIds.map(rId => ({
+        user_id: id,
+        app_role_id: rId
+      }));
       const { error: roleError } = await supabaseAdmin
         .from('user_app_roles')
-        .insert({
-          user_id: id,
-          app_role_id: appRoleId
-        });
+        .insert(toInsert);
       
-      if (roleError) console.error('Error assigning role:', roleError);
+      if (roleError) console.error('Error assigning roles:', roleError);
     }
 
     return NextResponse.json({ success: true });

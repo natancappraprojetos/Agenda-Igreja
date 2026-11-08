@@ -102,7 +102,7 @@ export interface EventType {
 
 // ---- Auth & Users ----
 
-export type AppRoleName = 'admin' | 'anciao' | 'diacono' | 'musica' | 'sonoplastia';
+export type AppRoleName = 'admin' | 'anciao' | 'diacono' | 'musica' | 'sonoplastia' | 'escola_sabatina';
 
 export interface AppRole {
   id: string;

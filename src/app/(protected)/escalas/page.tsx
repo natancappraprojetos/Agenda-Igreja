@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import Header from '@/components/layout/Header';
 import EscalasCalendar from '@/components/ui/EscalasCalendar';
-import { BookOpen, Mic, Headset, Shield, CalendarIcon } from 'lucide-react';
+import { BookOpen, Mic, Headset, Shield, GraduationCap, CalendarIcon } from 'lucide-react';
+
+type EscalaTab = 'pregadores' | 'musica' | 'sonoplastia' | 'diaconato' | 'escola_sabatina';
 
 export default function EscalasPage() {
   const { roles, isAdmin } = useAuth();
@@ -13,14 +15,26 @@ export default function EscalasPage() {
   const canSeeMusica = canSeeAll || roles.includes('musica');
   const canSeeSonoplastia = canSeeAll || roles.includes('sonoplastia');
   const canSeeDiaconato = canSeeAll || roles.includes('diacono');
-  
+  const canSeeEscolaSabatina = canSeeAll || roles.includes('escola_sabatina');
+
+  const availableTabs = useMemo(() => {
+    const tabs: Array<{ id: EscalaTab; label: string; icon: React.ReactNode }> = [];
+    if (canSeeAll) tabs.push({ id: 'pregadores', label: 'Púlpito (Anciãos)', icon: <BookOpen size={18} /> });
+    if (canSeeMusica) tabs.push({ id: 'musica', label: 'Ministério da Música', icon: <Mic size={18} /> });
+    if (canSeeSonoplastia) tabs.push({ id: 'sonoplastia', label: 'Sonoplastia', icon: <Headset size={18} /> });
+    if (canSeeDiaconato) tabs.push({ id: 'diaconato', label: 'Diaconato', icon: <Shield size={18} /> });
+    if (canSeeEscolaSabatina) tabs.push({ id: 'escola_sabatina', label: 'Escola Sabatina', icon: <GraduationCap size={18} /> });
+    return tabs;
+  }, [canSeeAll, canSeeMusica, canSeeSonoplastia, canSeeDiaconato, canSeeEscolaSabatina]);
+
   // Set initial tab based on permissions
-  const [activeTab, setActiveTab] = useState<'pregadores' | 'musica' | 'sonoplastia' | 'diaconato'>(
-    canSeeAll ? 'pregadores' : 
-    roles.includes('musica') ? 'musica' :
-    roles.includes('sonoplastia') ? 'sonoplastia' : 
-    roles.includes('diacono') ? 'diaconato' : 'pregadores'
-  );
+  const [activeTab, setActiveTab] = useState<EscalaTab>('pregadores');
+
+  useEffect(() => {
+    if (availableTabs.length > 0 && !availableTabs.some(t => t.id === activeTab)) {
+      setActiveTab(availableTabs[0].id);
+    }
+  }, [availableTabs, activeTab]);
 
   return (
     <>
@@ -29,33 +43,18 @@ export default function EscalasPage() {
       <div className="app-content">
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
           
-          {/* Tabs for Departments - Only show if user has access to multiple */}
-          {canSeeAll && (
+          {/* Tabs for Departments - Shown if user has access to 2 or more departments */}
+          {availableTabs.length > 1 && (
             <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-6)', borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--space-2)', overflowX: 'auto' }}>
-              <button 
-                className={`btn ${activeTab === 'pregadores' ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => setActiveTab('pregadores')}
-              >
-                <BookOpen size={18} /> Púlpito (Anciãos)
-              </button>
-              <button 
-                className={`btn ${activeTab === 'musica' ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => setActiveTab('musica')}
-              >
-                <Mic size={18} /> Ministério da Música
-              </button>
-              <button 
-                className={`btn ${activeTab === 'sonoplastia' ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => setActiveTab('sonoplastia')}
-              >
-                <Headset size={18} /> Sonoplastia
-              </button>
-              <button 
-                className={`btn ${activeTab === 'diaconato' ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => setActiveTab('diaconato')}
-              >
-                <Shield size={18} /> Diaconato
-              </button>
+              {availableTabs.map(tab => (
+                <button 
+                  key={tab.id}
+                  className={`btn ${activeTab === tab.id ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
             </div>
           )}
 
@@ -65,7 +64,7 @@ export default function EscalasPage() {
               <span style={{ fontWeight: 600, color: 'var(--text)' }}>Visão de Liderança</span>
             </div>
             <p style={{ margin: 'var(--space-2) 0 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              Selecione o evento desejado no calendário abaixo para atribuir as funções. Os espaços de rascunho (tracejados) foram criados especificamente para gerenciar a escala e não aparecem na Agenda Geral pública.
+              Selecione o evento desejado no calendário abaixo para atribuir os voluntários ou clique em <strong>Tirar Escala</strong> para visualizar, imprimir ou copiar a escala do mês ou trimestre com todos os nomes.
             </p>
           </div>
 
@@ -74,7 +73,7 @@ export default function EscalasPage() {
               title="Escala de Pregadores" 
               icon={<BookOpen size={20} color="var(--primary)" />}
               eventTypesToInclude={['Culto', 'Programa Jovem', 'Desbravadores', 'Batismo', 'Evento Especial']}
-              rolesToManage={['Pregador(a)']}
+              rolesToManage={['Pregador(a)', 'Pregador']}
             />
           )}
 
@@ -101,7 +100,16 @@ export default function EscalasPage() {
               title="Escala de Diaconato" 
               icon={<Shield size={20} color="var(--primary)" />}
               eventTypesToInclude={['Culto', 'Programa Jovem', 'Desbravadores', 'Batismo', 'Evento Especial']}
-              rolesToManage={['Diácono/Diaconisa']}
+              rolesToManage={['Diácono/Diaconisa', 'Diácono', 'Diaconisa']}
+            />
+          )}
+
+          {activeTab === 'escola_sabatina' && canSeeEscolaSabatina && (
+            <EscalasCalendar 
+              title="Escala da Escola Sabatina" 
+              icon={<GraduationCap size={20} color="var(--primary)" />}
+              eventTypesToInclude={['Culto', 'Escola Sabatina', 'Programa Jovem', 'Evento Especial']}
+              rolesToManage={['Escola Sabatina', 'Professor', 'Diretor']}
             />
           )}
 

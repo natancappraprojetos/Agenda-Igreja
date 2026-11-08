@@ -22,6 +22,25 @@ interface UsersClientProps {
   appRoles: Role[];
 }
 
+export function formatRoleLabel(roleName: string): string {
+  switch (roleName) {
+    case 'admin':
+      return 'Administrador';
+    case 'anciao':
+      return 'Ancião / Liderança';
+    case 'diacono':
+      return 'Diaconato';
+    case 'musica':
+      return 'Ministério da Música';
+    case 'sonoplastia':
+      return 'Sonoplastia';
+    case 'escola_sabatina':
+      return 'Escola Sabatina';
+    default:
+      return roleName;
+  }
+}
+
 export default function UsersClient({ initialUsers, appRoles }: UsersClientProps) {
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -31,13 +50,13 @@ export default function UsersClient({ initialUsers, appRoles }: UsersClientProps
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [appRoleId, setAppRoleId] = useState('');
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const { addToast } = useToast();
 
   const handleCreate = async () => {
-    if (!email || !password || !name) {
+    if (!email || !name || (!isEditMode && !password)) {
       addToast({ type: 'error', title: 'Preencha os campos obrigatórios' });
       return;
     }
@@ -50,40 +69,43 @@ export default function UsersClient({ initialUsers, appRoles }: UsersClientProps
       const res = await fetch(endpoint, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name, appRoleId })
+        body: JSON.stringify({ 
+          email, 
+          password: password || undefined, 
+          name, 
+          appRoleIds: selectedRoleIds 
+        })
       });
 
       const data = await res.json();
       
       if (!res.ok) throw new Error(data.error || 'Erro desconhecido');
 
+      const selectedRoles = appRoles.filter(r => selectedRoleIds.includes(r.id));
+
       if (!isEditMode) {
         addToast({ type: 'success', title: 'Acesso criado com sucesso!' });
         
-        // Add the new user to state to reflect immediately
-        const newRole = appRoles.find(r => r.id === appRoleId);
+        // Add new user to state
         setUsers([...users, {
           id: data.user.id,
           email: email,
           name: name,
-          roles: newRole ? [newRole] : []
+          roles: selectedRoles
         }]);
       } else {
         addToast({ type: 'success', title: 'Acesso atualizado com sucesso!' });
         
         // Update user in state
-        const updatedRole = appRoles.find(r => r.id === appRoleId);
         setUsers(users.map(u => u.id === editingUserId ? {
           ...u,
           email: email,
           name: name,
-          roles: updatedRole ? [updatedRole] : []
+          roles: selectedRoles
         } : u));
       }
 
       setIsModalOpen(false);
-
-      // Reset
       resetForm();
       
     } catch (err: any) {
@@ -99,7 +121,7 @@ export default function UsersClient({ initialUsers, appRoles }: UsersClientProps
     setName(u.name);
     setEmail(u.email);
     setPassword(''); // leave blank
-    setAppRoleId(u.roles[0]?.id || '');
+    setSelectedRoleIds(u.roles ? u.roles.map(r => r.id) : []);
     setIsModalOpen(true);
   };
 
@@ -129,7 +151,7 @@ export default function UsersClient({ initialUsers, appRoles }: UsersClientProps
     setEmail('');
     setPassword('');
     setName('');
-    setAppRoleId('');
+    setSelectedRoleIds([]);
   };
 
   return (
@@ -146,15 +168,23 @@ export default function UsersClient({ initialUsers, appRoles }: UsersClientProps
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', backgroundColor: 'var(--border)' }}>
             {users.map(u => (
-              <div key={u.id} style={{ backgroundColor: 'var(--surface)', padding: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={u.id} style={{ backgroundColor: 'var(--surface)', padding: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
                 <div>
                   <div style={{ fontWeight: 600 }}>{u.name}</div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{u.email}</div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  {u.roles.map((r, i) => (
-                    <span key={i} className="badge badge-info">{r.name}</span>
-                  ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {u.roles && u.roles.length > 0 ? (
+                      u.roles.map((r, i) => (
+                        <span key={i} className="badge badge-info" title={r.description}>
+                          {formatRoleLabel(r.name)}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="badge badge-ghost">Sem ministério</span>
+                    )}
+                  </div>
                   <button className="btn btn-ghost btn-sm" onClick={() => handleEditClick(u)}>✏️ Editar</button>
                   <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDeleteClick(u.id)}>🗑️</button>
                 </div>
@@ -201,7 +231,7 @@ export default function UsersClient({ initialUsers, appRoles }: UsersClientProps
         </div>
 
         <div className="form-group">
-          <label className="form-label">{isEditMode ? 'Nova Senha (deixe em branco para não alterar)' : 'Senha *'}</label>
+          <label className="form-label">{isEditMode ? 'Nova Senha (deixe em branco para manter)' : 'Senha *'}</label>
           <input 
             type="text" 
             className="form-input" 
@@ -212,13 +242,67 @@ export default function UsersClient({ initialUsers, appRoles }: UsersClientProps
         </div>
 
         <div className="form-group">
-          <label className="form-label">Nível de Acesso (Perfil)</label>
-          <select className="form-input" value={appRoleId} onChange={e => setAppRoleId(e.target.value)}>
-            <option value="">(Sem permissão especial)</option>
-            {appRoles.map(r => (
-              <option key={r.id} value={r.id}>{r.name} - {r.description}</option>
-            ))}
-          </select>
+          <label className="form-label" style={{ fontWeight: 600, marginBottom: '8px' }}>
+            Ministérios / Perfis de Acesso (Selecione um ou mais)
+          </label>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            maxHeight: '260px',
+            overflowY: 'auto',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-3)',
+            backgroundColor: 'var(--background-secondary)'
+          }}>
+            {appRoles.map(r => {
+              const isChecked = selectedRoleIds.includes(r.id);
+              return (
+                <label
+                  key={r.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    cursor: 'pointer',
+                    padding: '8px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    backgroundColor: isChecked ? 'rgba(59, 130, 246, 0.08)' : 'var(--surface)',
+                    border: isChecked ? '1px solid var(--primary)' : '1px solid var(--border)',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    style={{ marginTop: '3px', cursor: 'pointer', width: '16px', height: '16px' }}
+                    checked={isChecked}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedRoleIds([...selectedRoleIds, r.id]);
+                      } else {
+                        setSelectedRoleIds(selectedRoleIds.filter(id => id !== r.id));
+                      }
+                    }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text)' }}>
+                        {formatRoleLabel(r.name)}
+                      </span>
+                      <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>{r.name}</span>
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      {r.description}
+                    </div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '6px', display: 'block' }}>
+            Marque todos os departamentos que esse usuário terá permissão para gerenciar na Central de Escalas.
+          </span>
         </div>
       </Modal>
     </>

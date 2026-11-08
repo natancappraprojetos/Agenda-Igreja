@@ -32,11 +32,12 @@ export default function EquipePage() {
     if (roles.includes('sonoplastia')) rolesToManage.push('Sonoplasta');
     if (roles.includes('diacono')) rolesToManage.push('Diácono', 'Diaconisa', 'Diácono/Diaconisa');
     if (roles.includes('musica')) rolesToManage.push('Cantor(a) Solo', 'Cantor(a) Congregacional', 'Instrumentista', 'Líder de Louvor', 'Cantor', 'Pianista', 'Violonista');
+    if (roles.includes('escola_sabatina')) rolesToManage.push('Escola Sabatina', 'Professor', 'Diretor');
     if (roles.includes('anciao')) rolesToManage.push('Pregador', 'Pregador(a)', 'Ancião');
     return rolesToManage;
   }, [roles]);
 
-  const isStrictLeader = roles.some(r => ['musica', 'sonoplastia', 'diacono'].includes(r));
+  const isStrictLeader = roles.some(r => ['musica', 'sonoplastia', 'diacono', 'escola_sabatina'].includes(r));
   const pageTitle = (!isStrictLeader && roles.includes('anciao')) ? 'Lista de Pregadores' : 'Minha Equipe';
 
   const fetchData = useCallback(async () => {

@@ -30,7 +30,7 @@ export default async function UsuariosPage() {
       email: authUser.email || '',
       name: authUser.user_metadata?.name || personName || 'Sem nome',
       person_id: personId || null,
-      roles: pubUser?.roles?.map((r: any) => r.app_role) || []
+      roles: pubUser?.roles?.map((r: any) => r.app_role).filter(Boolean) || []
     };
   });
 

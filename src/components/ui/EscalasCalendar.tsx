@@ -7,8 +7,9 @@ import { useToast } from '@/lib/hooks/useToast';
 import PersonSelect from './PersonSelect';
 import Modal from './Modal';
 import MiniCalendar from './MiniCalendar';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Printer, Download, Copy, Check } from 'lucide-react';
 import { format } from 'date-fns';
+import html2canvas from 'html2canvas';
 import {
   getMonthDays, isToday, isSameDay, formatMonthYear, toDateString, parseDate
 } from '@/lib/utils/dates';
@@ -50,6 +51,14 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
   
   // Selected event modal
   const [selectedEvent, setSelectedEvent] = useState<ChurchEvent | null>(null);
+
+  // Export / Print Modal state
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportPeriod, setExportPeriod] = useState<'mes' | 'trimestre'>('mes');
+  const [trimestreEvents, setTrimestreEvents] = useState<ChurchEvent[]>([]);
+  const [trimestreParticipants, setTrimestreParticipants] = useState<Record<string, EventParticipant[]>>({});
+  const [loadingExport, setLoadingExport] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -122,6 +131,72 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
       addToast({ type: 'error', title: 'Erro ao carregar escala' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTrimestreData = async () => {
+    setLoadingExport(true);
+    try {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      const startDay = new Date(year, month, 1);
+      const endDay = new Date(year, month + 3, 0); // Last day of 3rd month
+
+      const startDate = toDateString(startDay);
+      const endDate = toDateString(endDay);
+
+      const { data: eData } = await supabase
+        .from('events')
+        .select('*, event_type:event_types(name, color)')
+        .in('status', ['scheduled', 'draft', 'confirmed', 'completed'])
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true })
+        .order('start_time', { ascending: true });
+
+      let filtered = (eData || []) as ChurchEvent[];
+      if (eventTypesToInclude && eventTypesToInclude.length > 0) {
+        filtered = filtered.filter(e => e.event_type && eventTypesToInclude.includes(e.event_type.name as string));
+      } else {
+        filtered = filtered.filter(e => e.event_type && (e.event_type.name as string).toLowerCase().includes('culto'));
+      }
+      setTrimestreEvents(filtered);
+
+      const roleIds = Object.values(roleMap);
+      if (filtered.length > 0 && roleIds.length > 0) {
+        const eventIds = filtered.map(e => e.id);
+        const { data: pData } = await supabase
+          .from('event_participants')
+          .select('*, person:people(id, name, whatsapp)')
+          .in('event_id', eventIds)
+          .in('role_id', roleIds);
+
+        const pMap: Record<string, EventParticipant[]> = {};
+        pData?.forEach(p => {
+          if (!pMap[p.event_id]) pMap[p.event_id] = [];
+          pMap[p.event_id].push(p as EventParticipant);
+        });
+        setTrimestreParticipants(pMap);
+      }
+    } catch (err) {
+      console.error(err);
+      addToast({ type: 'error', title: 'Erro ao carregar escala do trimestre' });
+    } finally {
+      setLoadingExport(false);
+    }
+  };
+
+  const handleOpenExportModal = () => {
+    setShowExportModal(true);
+    if (exportPeriod === 'trimestre') {
+      fetchTrimestreData();
+    }
+  };
+
+  const handleSelectPeriod = (period: 'mes' | 'trimestre') => {
+    setExportPeriod(period);
+    if (period === 'trimestre' && trimestreEvents.length === 0) {
+      fetchTrimestreData();
     }
   };
 
@@ -271,17 +346,94 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
   const days = getMonthDays(currentDate.getFullYear(), currentDate.getMonth());
   const weekdays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
+  // Current display data for export modal
+  const displayEvents = exportPeriod === 'trimestre' ? trimestreEvents : events;
+  const displayParticipants = exportPeriod === 'trimestre' ? trimestreParticipants : participants;
+
+  const handleCopyWhatsApp = () => {
+    const periodLabel = exportPeriod === 'mes' 
+      ? formatMonthYear(currentDate) 
+      : `Trimestre (${formatMonthYear(currentDate)} a ${formatMonthYear(new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 1))})`;
+
+    let text = `📅 *${title.toUpperCase()}*\n`;
+    text += `🗓️ *Período:* ${periodLabel}\n`;
+    text += `🏛️ IASD Santo Afonso\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    if (displayEvents.length === 0) {
+      text += `_Nenhum evento encontrado para o período selecionado._\n`;
+    } else {
+      displayEvents.forEach(ev => {
+        const evParts = displayParticipants[ev.id] || [];
+        const dateObj = new Date(ev.date + 'T12:00:00');
+        const weekday = dateObj.toLocaleDateString('pt-BR', { weekday: 'short' });
+        const capWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+        const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+        text += `📌 *${capWeekday}, ${dateStr}* às *${formatTime(ev.start_time)}* - ${ev.title}\n`;
+        
+        rolesToManage.forEach(rName => {
+          const rId = roleMap[rName];
+          const assigned = evParts.filter(p => p.role_id === rId);
+          const names = assigned.map(a => a.person?.name).filter(Boolean).join(', ');
+          text += `   • *${rName}:* ${names || '_A Definir_'}\n`;
+        });
+        text += `\n`;
+      });
+    }
+
+    text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `_Acesse a agenda completa no aplicativo da igreja._`;
+
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+    addToast({ type: 'success', title: 'Escala copiada para a área de transferência!' });
+  };
+
+  const handleDownloadImage = async () => {
+    const printArea = document.getElementById('escala-printable-doc');
+    if (!printArea) return;
+    try {
+      const canvas = await html2canvas(printArea, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false,
+        useCORS: true
+      });
+      const image = canvas.toDataURL('image/png', 1.0);
+      const link = document.createElement('a');
+      const periodSlug = exportPeriod === 'mes' ? formatMonthYear(currentDate) : 'Trimestre';
+      link.download = `${title.replace(/\s+/g, '_')}_${periodSlug.replace(/\s+/g, '_')}.png`;
+      link.href = image;
+      link.click();
+      addToast({ type: 'success', title: 'Imagem baixada com sucesso!' });
+    } catch (err) {
+      console.error(err);
+      addToast({ type: 'error', title: 'Erro ao gerar imagem' });
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <>
       <div className="card" style={{ padding: 0, marginBottom: 'var(--space-6)' }}>
-        <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             {icon}
             <h2 style={{ margin: 0, fontSize: '1.1rem' }}>{title}</h2>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowDraftModal(true)}>
-            + Criar Espaço de Escala
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary btn-sm" onClick={handleOpenExportModal}>
+              <Printer size={16} /> Tirar Escala (Mês / Trimestre)
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowDraftModal(true)}>
+              + Criar Espaço de Escala
+            </button>
+          </div>
         </div>
       
         <div style={{ padding: 'var(--space-4)' }}>
@@ -394,7 +546,13 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', paddingBottom: '180px' }}>
             {rolesToManage.map(roleName => {
               const roleId = roleMap[roleName];
-              const isMultiple = roleName.toLowerCase().includes('congregacional') || roleName.toLowerCase().includes('grupo');
+              const isMultiple = roleName.toLowerCase().includes('congregacional') || 
+                                 roleName.toLowerCase().includes('grupo') || 
+                                 roleName.toLowerCase().includes('diácon') || 
+                                 roleName.toLowerCase().includes('diacon') || 
+                                 roleName.toLowerCase().includes('professor') || 
+                                 roleName.toLowerCase().includes('recepção') || 
+                                 roleName.toLowerCase().includes('recepcao');
               const eventParts = participants[selectedEvent.id] || [];
               const roleAssignees = eventParts.filter(p => p.role_id === roleId);
               const currentAssignee = roleAssignees.length > 0 ? roleAssignees[0] : null;
@@ -522,6 +680,159 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
               <input type="text" className="input" placeholder="Ex: Pr. João, Joãozinho" value={newDraft.requester || ''} onChange={e => setNewDraft({...newDraft, requester: e.target.value})} />
             </div>
           </div>
+        </div>
+      </Modal>
+
+      {/* Tirar Escala (Print / Export Modal) */}
+      <Modal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        title={`Tirar Escala — ${title}`}
+        size="lg"
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button 
+                className={`btn btn-sm ${exportPeriod === 'mes' ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => handleSelectPeriod('mes')}
+              >
+                📅 Mês Atual
+              </button>
+              <button 
+                className={`btn btn-sm ${exportPeriod === 'trimestre' ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => handleSelectPeriod('trimestre')}
+              >
+                🗓️ Trimestre (3 Meses)
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button className="btn btn-secondary btn-sm" onClick={handleCopyWhatsApp}>
+                {copied ? <Check size={16} /> : <Copy size={16} />} {copied ? 'Copiado!' : 'Copiar p/ WhatsApp'}
+              </button>
+              <button className="btn btn-secondary btn-sm" onClick={handleDownloadImage}>
+                <Download size={16} /> Baixar Imagem (PNG)
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={handlePrint}>
+                <Printer size={16} /> Imprimir / PDF
+              </button>
+            </div>
+          </div>
+        }
+      >
+        <style>{`
+          @media print {
+            body * {
+              visibility: hidden !important;
+            }
+            #escala-printable-doc, #escala-printable-doc * {
+              visibility: visible !important;
+            }
+            #escala-printable-doc {
+              position: fixed !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100vw !important;
+              margin: 0 !important;
+              padding: 20px !important;
+              border: none !important;
+              box-shadow: none !important;
+              z-index: 999999 !important;
+              background: white !important;
+              color: black !important;
+            }
+          }
+        `}</style>
+
+        <div style={{ marginBottom: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            Exibindo escala com o nome dos voluntários escalados:
+          </span>
+          {loadingExport && <span style={{ fontSize: '0.85rem', color: 'var(--primary)' }}>Carregando trimestre...</span>}
+        </div>
+
+        <div 
+          id="escala-printable-doc" 
+          style={{ 
+            backgroundColor: '#ffffff', 
+            color: '#111827', 
+            padding: '24px', 
+            borderRadius: '8px', 
+            border: '1px solid #e5e7eb',
+            maxHeight: '60vh',
+            overflowY: 'auto'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #2563eb', paddingBottom: '12px', marginBottom: '16px' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#1e3a8a' }}>{title}</h2>
+              <p style={{ margin: '4px 0 0', color: '#4b5563', fontSize: '0.95rem', fontWeight: 600 }}>
+                {exportPeriod === 'mes' 
+                  ? formatMonthYear(currentDate) 
+                  : `Trimestre: ${formatMonthYear(currentDate)} a ${formatMonthYear(new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 1))}`}
+              </p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e40af' }}>IASD Santo Afonso</div>
+              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Gestão de Escalas</div>
+            </div>
+          </div>
+
+          {displayEvents.length === 0 ? (
+            <p style={{ textAlign: 'center', padding: '24px', color: '#6b7280' }}>Nenhum evento encontrado no período.</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left' }}>
+                    <th style={{ padding: '10px 12px', color: '#334155' }}>Data</th>
+                    <th style={{ padding: '10px 12px', color: '#334155', width: '70px' }}>Horário</th>
+                    <th style={{ padding: '10px 12px', color: '#334155' }}>Culto / Programação</th>
+                    {rolesToManage.map(rName => (
+                      <th key={rName} style={{ padding: '10px 12px', color: '#334155' }}>{rName}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayEvents.map((ev, idx) => {
+                    const evParts = displayParticipants[ev.id] || [];
+                    const dateObj = new Date(ev.date + 'T12:00:00');
+                    const weekday = dateObj.toLocaleDateString('pt-BR', { weekday: 'short' });
+                    const capWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+                    const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                    
+                    return (
+                      <tr key={ev.id} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap', color: '#0f172a' }}>
+                          {capWeekday}, {dateStr}
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#475569', whiteSpace: 'nowrap' }}>
+                          {formatTime(ev.start_time)}
+                        </td>
+                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>
+                          {ev.title} {ev.status === 'draft' ? '(Rascunho)' : ''}
+                        </td>
+                        {rolesToManage.map(rName => {
+                          const rId = roleMap[rName];
+                          const parts = evParts.filter(p => p.role_id === rId);
+                          const names = parts.map(p => p.person?.name).filter(Boolean).join(', ');
+                          return (
+                            <td key={rName} style={{ padding: '10px 12px' }}>
+                              {names ? (
+                                <span style={{ fontWeight: 600, color: '#0f172a' }}>{names}</span>
+                              ) : (
+                                <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>A Definir</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </Modal>
     </>
