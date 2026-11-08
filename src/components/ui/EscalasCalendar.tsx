@@ -1,19 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { ChurchEvent, EventParticipant } from '@/lib/types';
 import { useToast } from '@/lib/hooks/useToast';
 import PersonSelect from './PersonSelect';
 import Modal from './Modal';
-import MiniCalendar from './MiniCalendar';
-import { Trash2, Printer, Download, Copy, Check } from 'lucide-react';
-import { format } from 'date-fns';
+import { Printer, Download, Copy, Check, Calendar as CalendarIcon, List, Clock, UserCheck } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import {
   getMonthDays, isToday, isSameDay, formatMonthYear, toDateString, parseDate
 } from '@/lib/utils/dates';
 import { formatTime } from '@/lib/utils/liturgy-calculator';
+
+const safeFormatTime = (time: string | null | undefined) => {
+  if (!time) return '--:--';
+  return formatTime(time);
+};
 
 interface EscalasCalendarProps {
   title: string;
@@ -22,6 +25,41 @@ interface EscalasCalendarProps {
   rolesToManage: string[];
 }
 
+const ROLE_CONFIG: Record<string, { aliases: string[]; isMultiple: boolean }> = {
+  'Diácono / Diaconisa': {
+    aliases: ['Diácono / Diaconisa', 'Diácono/Diaconisa', 'Diácono', 'Diaconisa'],
+    isMultiple: true
+  },
+  'Diácono/Diaconisa': {
+    aliases: ['Diácono / Diaconisa', 'Diácono/Diaconisa', 'Diácono', 'Diaconisa'],
+    isMultiple: true
+  },
+  'Abertura da Escola Sabatina': {
+    aliases: ['Abertura da Escola Sabatina', 'Escola Sabatina', 'Abertura'],
+    isMultiple: false
+  },
+  'Pregador(a)': {
+    aliases: ['Pregador(a)', 'Pregador'],
+    isMultiple: false
+  },
+  'Sonoplasta': {
+    aliases: ['Sonoplasta'],
+    isMultiple: false
+  },
+  'Líder de Louvor': {
+    aliases: ['Líder de Louvor'],
+    isMultiple: false
+  },
+  'Cantor(a) Solo': {
+    aliases: ['Cantor(a) Solo', 'Cantor'],
+    isMultiple: false
+  },
+  'Cantor(a) Congregacional': {
+    aliases: ['Cantor(a) Congregacional'],
+    isMultiple: true
+  }
+};
+
 export default function EscalasCalendar({ title, icon, eventTypesToInclude, rolesToManage }: EscalasCalendarProps) {
   const supabase = createClient();
   const { addToast } = useToast();
@@ -29,27 +67,19 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<ChurchEvent[]>([]);
   const [participants, setParticipants] = useState<Record<string, EventParticipant[]>>({});
-  const [roleMap, setRoleMap] = useState<Record<string, string>>({}); // name -> id
-  const [eventTypes, setEventTypes] = useState<any[]>([]);
   
-  // Create draft state
-  const [showDraftModal, setShowDraftModal] = useState(false);
-  const [newDraft, setNewDraft] = useState<{
-    date: Date | null, 
-    time: string, 
-    typeId: string, 
-    linkToParent?: string | false, 
-    requester?: string
-  }>({ 
-    date: null, 
-    time: '09:00', 
-    typeId: '' 
-  });
+  // Mapping: managedRole -> primaryRoleId (used for new inserts)
+  const [primaryRoleMap, setPrimaryRoleMap] = useState<Record<string, string>>({});
+  // Mapping: managedRole -> all matching role IDs (used for querying and filtering)
+  const [aliasRoleMap, setAliasRoleMap] = useState<Record<string, string[]>>({});
+
+  // View state: 'lista' (default, perfect for mobile) or 'calendario'
+  const [viewMode, setViewMode] = useState<'lista' | 'calendario'>('lista');
 
   // Calendar state
   const [currentDate, setCurrentDate] = useState(new Date());
   
-  // Selected event modal
+  // Selected event modal for assigning
   const [selectedEvent, setSelectedEvent] = useState<ChurchEvent | null>(null);
 
   // Export / Print Modal state
@@ -62,20 +92,40 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
 
   useEffect(() => {
     fetchData();
-  }, [currentDate]); // Refetch when month changes
+  }, [currentDate, rolesToManage]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch the requested roles
+      // 1. Fetch role IDs for all aliases of rolesToManage
+      const allAliases = Array.from(new Set(rolesToManage.flatMap(r => ROLE_CONFIG[r]?.aliases || [r])));
       const { data: rolesData } = await supabase
         .from('roles')
         .select('id, name')
-        .in('name', rolesToManage);
+        .in('name', allAliases);
 
-      const rMap: Record<string, string> = {};
-      rolesData?.forEach(r => { rMap[r.name] = r.id; });
-      setRoleMap(rMap);
+      const pMap: Record<string, string> = {};
+      const aMap: Record<string, string[]> = {};
+      const allQueryRoleIds: string[] = [];
+
+      rolesToManage.forEach(mRole => {
+        const aliases = ROLE_CONFIG[mRole]?.aliases || [mRole];
+        const matching = (rolesData || []).filter(r => aliases.some(a => a.toLowerCase() === r.name.toLowerCase()));
+        
+        // Primary role: exact match preferred, otherwise first match
+        const exact = matching.find(r => r.name.toLowerCase() === mRole.toLowerCase());
+        const primary = exact || matching[0];
+        if (primary) pMap[mRole] = primary.id;
+
+        const ids = matching.map(r => r.id);
+        aMap[mRole] = ids;
+        ids.forEach(id => {
+          if (!allQueryRoleIds.includes(id)) allQueryRoleIds.push(id);
+        });
+      });
+
+      setPrimaryRoleMap(pMap);
+      setAliasRoleMap(aMap);
 
       // Calendar range
       const days = getMonthDays(currentDate.getFullYear(), currentDate.getMonth());
@@ -86,7 +136,7 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
       let eventsQuery = supabase
         .from('events')
         .select('*, event_type:event_types(name, color)')
-        .in('status', ['scheduled', 'draft', 'confirmed', 'completed'])
+        .in('status', ['scheduled', 'confirmed', 'completed'])
         .gte('date', startDate)
         .lte('date', endDate)
         .order('date', { ascending: true })
@@ -94,7 +144,6 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
         
       const { data: eData } = await eventsQuery;
       
-      // Filter events in memory based on eventTypesToInclude if provided
       let filteredEvents = (eData || []) as ChurchEvent[];
       if (eventTypesToInclude && eventTypesToInclude.length > 0) {
         filteredEvents = filteredEvents.filter(e => e.event_type && eventTypesToInclude.includes(e.event_type.name as string));
@@ -103,28 +152,25 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
       }
       setEvents(filteredEvents);
 
-      // 3. Fetch participants for these events, for the managed roles
-      if (filteredEvents.length > 0 && rolesData && rolesData.length > 0) {
+      // 3. Fetch participants for these events
+      if (filteredEvents.length > 0 && allQueryRoleIds.length > 0) {
         const eventIds = filteredEvents.map(e => e.id);
-        const roleIds = rolesData.map(r => r.id);
         
         const { data: pData } = await supabase
           .from('event_participants')
           .select('*, person:people(id, name, whatsapp)')
           .in('event_id', eventIds)
-          .in('role_id', roleIds);
+          .in('role_id', allQueryRoleIds);
 
-        const pMap: Record<string, EventParticipant[]> = {};
+        const partMap: Record<string, EventParticipant[]> = {};
         pData?.forEach(p => {
-          if (!pMap[p.event_id]) pMap[p.event_id] = [];
-          pMap[p.event_id].push(p as EventParticipant);
+          if (!partMap[p.event_id]) partMap[p.event_id] = [];
+          partMap[p.event_id].push(p as EventParticipant);
         });
-        setParticipants(pMap);
+        setParticipants(partMap);
+      } else {
+        setParticipants({});
       }
-      
-      // Fetch event types for the modal
-      const { data: typesData } = await supabase.from('event_types').select('*').order('name');
-      if (typesData) setEventTypes(typesData);
 
     } catch (err) {
       console.error(err);
@@ -148,7 +194,7 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
       const { data: eData } = await supabase
         .from('events')
         .select('*, event_type:event_types(name, color)')
-        .in('status', ['scheduled', 'draft', 'confirmed', 'completed'])
+        .in('status', ['scheduled', 'confirmed', 'completed'])
         .gte('date', startDate)
         .lte('date', endDate)
         .order('date', { ascending: true })
@@ -162,14 +208,14 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
       }
       setTrimestreEvents(filtered);
 
-      const roleIds = Object.values(roleMap);
-      if (filtered.length > 0 && roleIds.length > 0) {
+      const allQueryRoleIds = Array.from(new Set(Object.values(aliasRoleMap).flat()));
+      if (filtered.length > 0 && allQueryRoleIds.length > 0) {
         const eventIds = filtered.map(e => e.id);
         const { data: pData } = await supabase
           .from('event_participants')
           .select('*, person:people(id, name, whatsapp)')
           .in('event_id', eventIds)
-          .in('role_id', roleIds);
+          .in('role_id', allQueryRoleIds);
 
         const pMap: Record<string, EventParticipant[]> = {};
         pData?.forEach(p => {
@@ -200,89 +246,13 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
     }
   };
 
-  const handleCreateDraft = async () => {
-    if (!newDraft.date || !newDraft.typeId) {
-      addToast({ type: 'error', title: 'Preencha a data e o tipo de evento' });
-      return;
-    }
-    setLoading(true);
-    try {
-      const dateStr = format(newDraft.date, 'yyyy-MM-dd');
-      
-      let finalTime = newDraft.time;
-      let finalParentId: string | null = null;
-
-      const eventType = eventTypes.find(t => t.id === newDraft.typeId);
-      const isSubEvent = eventType && !eventType.name.toLowerCase().includes('culto');
-      const existingCultos = events.filter(e => e.date === dateStr && e.status !== 'draft' && e.event_type && (e.event_type as any).name.toLowerCase().includes('culto'));
-
-      if (isSubEvent && newDraft.linkToParent !== false && existingCultos.length > 0) {
-        finalParentId = newDraft.linkToParent || existingCultos[0].id;
-        finalTime = existingCultos.find(c => c.id === finalParentId)?.start_time || '09:00';
-      } else {
-         if (!newDraft.time) {
-           addToast({ type: 'error', title: 'Preencha o horário' });
-           setLoading(false);
-           return;
-         }
-      }
-      
-      const { data: existing } = await supabase
-        .from('events')
-        .select('id')
-        .eq('date', dateStr)
-        .eq('start_time', finalTime)
-        .eq('event_type_id', newDraft.typeId)
-        .maybeSingle();
-        
-      if (existing) {
-        addToast({ type: 'error', title: 'Já existe um evento desse tipo para esta data e horário!' });
-        setLoading(false);
-        return;
-      }
-      
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      const { error } = await supabase.from('events').insert({
-        title: eventType ? `${eventType.name} (Rascunho)` : 'Culto (Rascunho)',
-        date: dateStr,
-        start_time: finalTime,
-        event_type_id: newDraft.typeId,
-        parent_event_id: finalParentId,
-        status: 'draft',
-        notes: newDraft.requester ? `Solicitado por: ${newDraft.requester}` : null,
-        created_by: currentUser?.id || null
-      });
-      if (error) throw error;
-      addToast({ type: 'success', title: 'Espaço de escala criado!' });
-      setShowDraftModal(false);
-      setNewDraft({ date: null, time: '09:00', typeId: '', linkToParent: undefined, requester: '' });
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      addToast({ type: 'error', title: 'Erro ao criar espaço' });
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteDraft = async (id: string) => {
-    if (!confirm('Deseja realmente excluir este espaço de escala? (Qualquer pessoa escalada nele será removida)')) return;
-    try {
-      const { error } = await supabase.from('events').delete().eq('id', id);
-      if (error) throw error;
-      addToast({ type: 'success', title: 'Espaço excluído' });
-      setSelectedEvent(null);
-      fetchData();
-    } catch (err) {
-      addToast({ type: 'error', title: 'Erro ao excluir' });
-    }
-  };
-
-  const handleAssignPerson = async (eventId: string, roleName: string, personId: string | null) => {
-    const roleId = roleMap[roleName];
-    if (!roleId) return;
+  const handleAssignPerson = async (eventId: string, managedRole: string, personId: string | null) => {
+    const roleId = primaryRoleMap[managedRole];
+    const aliasIds = aliasRoleMap[managedRole] || [];
+    if (!roleId && aliasIds.length === 0) return;
 
     try {
-      const existing = participants[eventId]?.find(p => p.role_id === roleId);
+      const existing = participants[eventId]?.find(p => Boolean(p.role_id && aliasIds.includes(p.role_id)));
 
       if (!personId) {
         if (existing) {
@@ -295,7 +265,7 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
         } else {
           await supabase.from('event_participants').insert({
             event_id: eventId,
-            role_id: roleId,
+            role_id: roleId || aliasIds[0],
             person_id: personId
           });
         }
@@ -307,9 +277,13 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
     }
   };
 
-  const handleAddParticipant = async (eventId: string, roleId: string, personId: string) => {
+  const handleAddParticipant = async (eventId: string, managedRole: string, personId: string) => {
+    const roleId = primaryRoleMap[managedRole] || (aliasRoleMap[managedRole] || [])[0];
+    const aliasIds = aliasRoleMap[managedRole] || [];
+    if (!roleId) return;
+
     try {
-      const existing = participants[eventId]?.find(p => p.role_id === roleId && p.person_id === personId);
+      const existing = participants[eventId]?.find(p => Boolean(p.role_id && aliasIds.includes(p.role_id)) && p.person_id === personId);
       if (existing) return;
       
       await supabase.from('event_participants').insert({
@@ -317,10 +291,10 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
         role_id: roleId,
         person_id: personId
       });
-      addToast({ type: 'success', title: 'Pessoa adicionada com sucesso!' });
+      addToast({ type: 'success', title: 'Voluntário adicionado!' });
       fetchData();
     } catch (err) {
-      addToast({ type: 'error', title: 'Erro ao adicionar' });
+      addToast({ type: 'error', title: 'Erro ao adicionar voluntário' });
     }
   };
 
@@ -343,6 +317,11 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
 
   const getEventsForDate = (date: Date) => events.filter(e => isSameDay(parseDate(e.date), date));
 
+  const getAssignedPeople = (eventId: string, managedRole: string, pSource: Record<string, EventParticipant[]> = participants) => {
+    const aliasIds = aliasRoleMap[managedRole] || [];
+    return (pSource[eventId] || []).filter(p => Boolean(p.role_id && aliasIds.includes(p.role_id)));
+  };
+
   const days = getMonthDays(currentDate.getFullYear(), currentDate.getMonth());
   const weekdays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -361,34 +340,32 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
     text += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     if (displayEvents.length === 0) {
-      text += `_Nenhum evento encontrado para o período selecionado._\n`;
+      text += `_Nenhum culto encontrado para o período selecionado._\n`;
     } else {
       displayEvents.forEach(ev => {
-        const evParts = displayParticipants[ev.id] || [];
         const dateObj = new Date(ev.date + 'T12:00:00');
         const weekday = dateObj.toLocaleDateString('pt-BR', { weekday: 'short' });
         const capWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
         const dateStr = dateObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 
-        text += `📌 *${capWeekday}, ${dateStr}* às *${formatTime(ev.start_time)}* - ${ev.title}\n`;
+        text += `📌 *${capWeekday}, ${dateStr}* às *${safeFormatTime(ev.start_time)}* - ${ev.title}\n`;
         
-        rolesToManage.forEach(rName => {
-          const rId = roleMap[rName];
-          const assigned = evParts.filter(p => p.role_id === rId);
+        rolesToManage.forEach(mRole => {
+          const assigned = getAssignedPeople(ev.id, mRole, displayParticipants);
           const names = assigned.map(a => a.person?.name).filter(Boolean).join(', ');
-          text += `   • *${rName}:* ${names || '_A Definir_'}\n`;
+          text += `   • *${mRole}:* ${names || '_A Definir_'}\n`;
         });
         text += `\n`;
       });
     }
 
     text += `━━━━━━━━━━━━━━━━━━━━━\n`;
-    text += `_Acesse a agenda completa no aplicativo da igreja._`;
+    text += `_Escala gerada pela Central Santo Afonso_`;
 
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
-    addToast({ type: 'success', title: 'Escala copiada para a área de transferência!' });
+    addToast({ type: 'success', title: 'Escala copiada para o WhatsApp!' });
   };
 
   const handleDownloadImage = async () => {
@@ -414,183 +391,282 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <>
-      <div className="card" style={{ padding: 0, marginBottom: 'var(--space-6)' }}>
-        <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+      <div className="card" style={{ padding: 0, marginBottom: 'var(--space-6)', overflow: 'hidden' }}>
+        {/* Card Header */}
+        <div style={{
+          padding: '12px 16px',
+          borderBottom: '1px solid var(--border-color)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '10px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {icon}
-            <h2 style={{ margin: 0, fontSize: '1.1rem' }}>{title}</h2>
+            <h2 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>{title}</h2>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-            <button className="btn btn-secondary btn-sm" onClick={handleOpenExportModal}>
-              <Printer size={16} /> Tirar Escala (Mês / Trimestre)
-            </button>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowDraftModal(true)}>
-              + Criar Espaço de Escala
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* View Mode Toggle: Lista vs Calendário */}
+            <div style={{ display: 'flex', background: 'var(--background-secondary)', padding: '3px', borderRadius: 'var(--radius-md)' }}>
+              <button 
+                className={`btn btn-sm ${viewMode === 'lista' ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => setViewMode('lista')}
+                style={{ fontSize: '0.8rem', padding: '4px 10px', height: '32px' }}
+                title="Visualização em Lista"
+              >
+                <List size={15} style={{ marginRight: '4px' }} /> Lista
+              </button>
+              <button 
+                className={`btn btn-sm ${viewMode === 'calendario' ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => setViewMode('calendario')}
+                style={{ fontSize: '0.8rem', padding: '4px 10px', height: '32px' }}
+                title="Visualização em Grade Mensal"
+              >
+                <CalendarIcon size={15} style={{ marginRight: '4px' }} /> Mês
+              </button>
+            </div>
+
+            {/* Tirar Escala Button */}
+            <button 
+              className="btn btn-secondary btn-sm" 
+              onClick={handleOpenExportModal}
+              style={{ height: '32px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+            >
+              <Printer size={15} /> Tirar Escala
             </button>
           </div>
         </div>
       
-        <div style={{ padding: 'var(--space-4)' }}>
-          <div className="calendar-header" style={{ marginBottom: 'var(--space-4)' }}>
-            <div className="calendar-nav" style={{ flexWrap: 'wrap' }}>
+        <div style={{ padding: '16px' }}>
+          {/* Navigation Month */}
+          <div className="calendar-header" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="calendar-nav" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <button className="calendar-nav-btn" onClick={() => navigateMonth(-1)}>◀</button>
               <button className="calendar-nav-btn" onClick={() => setCurrentDate(new Date())}>Hoje</button>
               <button className="calendar-nav-btn" onClick={() => navigateMonth(1)}>▶</button>
-              <span className="calendar-current-date" style={{ fontWeight: 600 }}>{formatMonthYear(currentDate)}</span>
+              <span className="calendar-current-date" style={{ fontWeight: 700, marginLeft: '6px', fontSize: '1.05rem' }}>
+                {formatMonthYear(currentDate)}
+              </span>
             </div>
-            {loading && <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginLeft: 'var(--space-2)' }}>Carregando...</span>}
+            {loading && <span style={{ fontSize: '0.85rem', color: 'var(--primary)' }}>Carregando...</span>}
           </div>
 
-          <div className="calendar-grid">
-            {weekdays.map(day => (
-              <div key={day} className="calendar-weekday">{day}</div>
-            ))}
-            {days.map((day, i) => {
-              const dayEvents = getEventsForDate(day);
-              const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-              return (
-                <div
-                  key={i}
-                  className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''} ${isToday(day) ? 'today' : ''}`}
-                  style={{ minHeight: '100px' }}
-                >
-                  <div className="calendar-day-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="calendar-day-number">{day.getDate()}</span>
-                    <button 
-                      className="btn-icon" 
-                      style={{ padding: '2px', color: 'var(--text-tertiary)', fontSize: '1rem', lineHeight: 1 }}
-                      title="Criar Espaço de Escala neste dia"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setNewDraft({ date: day, time: '09:00', typeId: '', linkToParent: undefined, requester: '' });
-                        setShowDraftModal(true);
+          {/* VIEW 1: LIST VIEW (Ideal for Mobile and Quick Scaling) */}
+          {viewMode === 'lista' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {events.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>
+                  Nenhum culto programado para {formatMonthYear(currentDate)}.
+                </div>
+              ) : (
+                events.map(ev => {
+                  const dateObj = new Date(ev.date + 'T12:00:00');
+                  const weekday = dateObj.toLocaleDateString('pt-BR', { weekday: 'short' });
+                  const dayNum = dateObj.getDate();
+                  const isCurrentDay = isToday(dateObj);
+
+                  return (
+                    <div 
+                      key={ev.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 14px',
+                        backgroundColor: isCurrentDay ? 'rgba(37, 99, 235, 0.05)' : 'var(--surface)',
+                        border: isCurrentDay ? '1px solid var(--primary)' : '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-md)',
+                        gap: '12px',
+                        transition: 'background-color 0.15s ease'
                       }}
                     >
-                      +
-                    </button>
-                  </div>
-                  <div className="calendar-day-events" style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                    {dayEvents.map(ev => {
-                      const color = (ev.event_type as any)?.color || 'var(--primary)';
-                      return (
-                        <div
-                          key={ev.id}
-                          className="calendar-event-pill"
-                          style={{
-                            background: color,
-                            color: 'white',
-                            cursor: 'pointer',
-                            opacity: ev.status === 'draft' ? 0.7 : 1,
-                            border: ev.status === 'draft' ? '1px dashed white' : 'none'
-                          }}
-                          title={`${formatTime(ev.start_time)} ${ev.title}`}
-                          onClick={() => setSelectedEvent(ev)}
-                        >
-                          <span className="hide-on-mobile" style={{ marginRight: '4px' }}>{formatTime(ev.start_time)}</span>
-                          {ev.title} {ev.status === 'draft' ? '(Rascunho)' : ''}
+                      {/* Date Block */}
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '54px',
+                        height: '54px',
+                        backgroundColor: isCurrentDay ? 'var(--primary)' : 'var(--background-secondary)',
+                        color: isCurrentDay ? '#ffffff' : 'var(--text)',
+                        borderRadius: '8px',
+                        flexShrink: 0
+                      }}>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', opacity: 0.9 }}>
+                          {weekday}
+                        </span>
+                        <span style={{ fontSize: '1.2rem', fontWeight: 800, lineHeight: 1 }}>
+                          {dayNum}
+                        </span>
+                        <span style={{ fontSize: '0.65rem', fontWeight: 600, opacity: 0.8 }}>
+                          {safeFormatTime(ev.start_time)}
+                        </span>
+                      </div>
+
+                      {/* Event & Assigned Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>
+                          {ev.title}
                         </div>
-                      );
-                    })}
+                        <div style={{ marginTop: '4px', fontSize: '0.85rem' }}>
+                          {rolesToManage.map(mRole => {
+                            const assigned = getAssignedPeople(ev.id, mRole);
+                            const names = assigned.map(a => a.person?.name).filter(Boolean).join(', ');
+                            return (
+                              <div key={mRole} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px' }}>
+                                <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>{mRole}:</span>
+                                {names ? (
+                                  <span style={{ fontWeight: 600, color: 'var(--text)' }}>{names}</span>
+                                ) : (
+                                  <span style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>A Definir</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Escalar Button */}
+                      <button 
+                        className="btn btn-secondary btn-sm"
+                        style={{ alignSelf: 'center', whiteSpace: 'nowrap', borderRadius: '16px', padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600 }}
+                        onClick={() => setSelectedEvent(ev)}
+                      >
+                        ✏️ Escalar
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          ) : (
+            /* VIEW 2: CALENDAR GRID */
+            <div className="calendar-grid">
+              {weekdays.map(day => (
+                <div key={day} className="calendar-weekday">{day}</div>
+              ))}
+              {days.map((day, i) => {
+                const dayEvents = getEventsForDate(day);
+                const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                return (
+                  <div
+                    key={i}
+                    className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''} ${isToday(day) ? 'today' : ''}`}
+                    style={{ minHeight: '85px', padding: '4px' }}
+                  >
+                    <div className="calendar-day-header" style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
+                      <span className="calendar-day-number" style={{ fontWeight: 600 }}>{day.getDate()}</span>
+                    </div>
+                    <div className="calendar-day-events" style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '3px' }}>
+                      {dayEvents.map(ev => {
+                        const color = (ev.event_type as any)?.color || 'var(--primary)';
+                        return (
+                          <div
+                            key={ev.id}
+                            className="calendar-event-pill"
+                            style={{
+                              background: color,
+                              color: 'white',
+                              cursor: 'pointer',
+                              padding: '2px 4px',
+                              fontSize: '0.75rem',
+                              borderRadius: '4px'
+                            }}
+                            title={`${safeFormatTime(ev.start_time)} ${ev.title}`}
+                            onClick={() => setSelectedEvent(ev)}
+                          >
+                            <span style={{ fontWeight: 600, marginRight: '3px' }}>{safeFormatTime(ev.start_time)}</span>
+                            {ev.title}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Selected Event Modal */}
+      {/* Selected Event Modal (Assign Volunteers) */}
       {selectedEvent && (
         <Modal
           isOpen={true}
           onClose={() => setSelectedEvent(null)}
-          title={`Escala: ${(selectedEvent.event_type as any)?.name || 'Evento'} - ${new Date(selectedEvent.date + 'T12:00:00').toLocaleDateString('pt-BR')}`}
+          title={`Escala: ${(selectedEvent.event_type as any)?.name || 'Culto'} - ${new Date(selectedEvent.date + 'T12:00:00').toLocaleDateString('pt-BR')}`}
         >
           <div style={{ marginBottom: 'var(--space-4)' }}>
-             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 'var(--space-2)' }}>
-                <strong>Horário:</strong> {formatTime(selectedEvent.start_time)}
+             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
+                <strong>Horário do Culto:</strong> {safeFormatTime(selectedEvent.start_time)}
              </p>
-             {selectedEvent.status === 'draft' && (
-                <div style={{ padding: 'var(--space-3)', backgroundColor: 'var(--warning-light, #fff3cd)', borderRadius: 'var(--radius-md)', color: '#856404', fontSize: '0.9rem', marginBottom: 'var(--space-4)' }}>
-                   Este é um espaço de rascunho. Ele não aparecerá na Agenda Geral até que seja promovido a um evento oficial.
-                </div>
-             )}
           </div>
-          
-          {/* Sub-events (e.g. Batismo) */}
-          {events.filter(e => (e as any).parent_event_id === selectedEvent.id).length > 0 && (
-            <div className="subevents-list" style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', backgroundColor: 'var(--surface-hover)', borderRadius: 'var(--radius-md)' }}>
-              <h4 style={{ fontSize: '0.9rem', marginBottom: 'var(--space-2)' }}>Eventos Vinculados</h4>
-              {events.filter(e => (e as any).parent_event_id === selectedEvent.id).map(sub => (
-                 <div key={sub.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--space-2) 0', borderBottom: '1px dashed var(--border-color)' }}>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                     <span>{sub.event_type?.icon || '🔹'}</span>
-                     <span style={{ fontWeight: 500 }}>{sub.title}</span>
-                   </div>
-                   {sub.responsible_person_id && (
-                     <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                       Resp: {sub.responsible_person?.name || 'Definido'}
-                     </div>
-                   )}
-                 </div>
-               ))}
-            </div>
-          )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', paddingBottom: '180px' }}>
-            {rolesToManage.map(roleName => {
-              const roleId = roleMap[roleName];
-              const isMultiple = roleName.toLowerCase().includes('congregacional') || 
-                                 roleName.toLowerCase().includes('grupo') || 
-                                 roleName.toLowerCase().includes('diácon') || 
-                                 roleName.toLowerCase().includes('diacon') || 
-                                 roleName.toLowerCase().includes('professor') || 
-                                 roleName.toLowerCase().includes('recepção') || 
-                                 roleName.toLowerCase().includes('recepcao');
-              const eventParts = participants[selectedEvent.id] || [];
-              const roleAssignees = eventParts.filter(p => p.role_id === roleId);
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', paddingBottom: '160px' }}>
+            {rolesToManage.map(mRole => {
+              const isMultiple = ROLE_CONFIG[mRole]?.isMultiple ?? false;
+              const roleAssignees = getAssignedPeople(selectedEvent.id, mRole);
               const currentAssignee = roleAssignees.length > 0 ? roleAssignees[0] : null;
+              const filterRoleIds = aliasRoleMap[mRole] || [];
 
               return (
-                <div key={roleName} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                  <label style={{ fontWeight: 600, fontSize: '0.95rem' }}>{roleName}</label>
+                <div key={mRole} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  <label style={{ fontWeight: 600, fontSize: '0.95rem' }}>{mRole}</label>
                   
                   {isMultiple ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', border: '1px solid var(--border-color)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--background-secondary)' }}>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      border: '1px solid var(--border-color)',
+                      padding: 'var(--space-3)',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: 'var(--background-secondary)'
+                    }}>
                       {roleAssignees.map(assignee => (
-                        <div key={assignee.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--surface)', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-                          <span style={{ fontSize: '0.95rem', fontWeight: 500 }}>{assignee.person?.name}</span>
+                        <div 
+                          key={assignee.id} 
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            backgroundColor: 'var(--surface)',
+                            padding: '6px 12px',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--border-color)'
+                          }}
+                        >
+                          <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{assignee.person?.name}</span>
                           <button 
                             className="btn-icon" 
                             onClick={() => handleRemoveParticipant(assignee.id)}
-                            style={{ color: 'var(--text-danger)' }}
+                            style={{ color: 'var(--text-danger)', fontSize: '1.2rem', lineHeight: 1, padding: '2px 6px' }}
                             title="Remover"
                           >
                             ×
                           </button>
                         </div>
                       ))}
-                      <div style={{ marginTop: 'var(--space-2)' }}>
+                      <div style={{ marginTop: '4px' }}>
                         <PersonSelect 
                           value=""
-                          onChange={(personId) => personId && handleAddParticipant(selectedEvent.id, roleId, personId)}
-                          placeholder="Adicionar pessoa..."
-                          roleId={roleId}
+                          onChange={(personId) => personId && handleAddParticipant(selectedEvent.id, mRole, personId)}
+                          placeholder="Adicionar voluntário(a)..."
+                          roleId={filterRoleIds}
                         />
                       </div>
                     </div>
                   ) : (
                     <PersonSelect 
                       value={currentAssignee?.person_id || ''}
-                      onChange={(personId) => handleAssignPerson(selectedEvent.id, roleName, personId)}
+                      onChange={(personId) => handleAssignPerson(selectedEvent.id, mRole, personId)}
                       placeholder="Definir responsável..."
-                      roleId={roleId}
+                      roleId={filterRoleIds}
                     />
                   )}
                 </div>
@@ -603,85 +679,6 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
           </div>
         </Modal>
       )}
-
-      {/* Create Draft Modal */}
-      <Modal 
-        isOpen={showDraftModal} 
-        onClose={() => setShowDraftModal(false)}
-        title="Criar Espaço para Escala"
-        size="lg"
-        footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-            <button className="btn btn-ghost" onClick={() => setShowDraftModal(false)}>Cancelar</button>
-            <button className="btn btn-primary" onClick={handleCreateDraft}>Criar Espaço</button>
-          </div>
-        }
-      >
-        <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', fontSize: '0.9rem' }}>
-          Crie um espaço de evento antecipado para poder escalar sua equipe. Este rascunho não aparecerá na agenda geral até que o culto seja oficialmente criado.
-        </p>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)' }}>
-          <div>
-            <h4 style={{ marginBottom: 'var(--space-2)' }}>1. Selecione a Data</h4>
-            <MiniCalendar 
-              selectedDate={newDraft.date} 
-              onSelectDate={d => setNewDraft({...newDraft, date: d})} 
-            />
-          </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            <div className="form-group">
-              <label>2. Tipo de Evento</label>
-              <select className="input" value={newDraft.typeId} onChange={e => setNewDraft({...newDraft, typeId: e.target.value})}>
-                <option value="">Selecione...</option>
-                {eventTypes.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {(() => {
-              const eventType = eventTypes.find(t => t.id === newDraft.typeId);
-              const isSubEvent = eventType && !eventType.name.toLowerCase().includes('culto');
-              const dateStr = newDraft.date ? format(newDraft.date, 'yyyy-MM-dd') : '';
-              const existingCultos = events.filter(e => e.date === dateStr && e.status !== 'draft' && e.event_type && (e.event_type as any).name.toLowerCase().includes('culto'));
-              
-              return (
-                <>
-                  {isSubEvent && existingCultos.length > 0 && (
-                    <div className="form-group" style={{ backgroundColor: 'var(--background-secondary)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 500, fontSize: '0.9rem' }}>
-                        <input 
-                          type="checkbox" 
-                          checked={newDraft.linkToParent !== false} 
-                          onChange={e => setNewDraft({...newDraft, linkToParent: e.target.checked ? existingCultos[0].id : false})} 
-                        />
-                        Vincular ao {existingCultos[0].title} desse dia?
-                      </label>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '4px', paddingLeft: '24px' }}>
-                        O horário será puxado automaticamente do culto.
-                      </div>
-                    </div>
-                  )}
-
-                  {(!isSubEvent || existingCultos.length === 0 || newDraft.linkToParent === false) && (
-                    <div className="form-group">
-                      <label>3. Horário do Evento</label>
-                      <input type="time" className="input" value={newDraft.time} onChange={e => setNewDraft({...newDraft, time: e.target.value})} />
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-
-            <div className="form-group">
-              <label>Quem solicitou? (Opcional)</label>
-              <input type="text" className="input" placeholder="Ex: Pr. João, Joãozinho" value={newDraft.requester || ''} onChange={e => setNewDraft({...newDraft, requester: e.target.value})} />
-            </div>
-          </div>
-        </div>
-      </Modal>
 
       {/* Tirar Escala (Print / Export Modal) */}
       <Modal
@@ -708,13 +705,13 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
 
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button className="btn btn-secondary btn-sm" onClick={handleCopyWhatsApp}>
-                {copied ? <Check size={16} /> : <Copy size={16} />} {copied ? 'Copiado!' : 'Copiar p/ WhatsApp'}
+                {copied ? <Check size={15} /> : <Copy size={15} />} {copied ? 'Copiado!' : 'Copiar p/ WhatsApp'}
               </button>
               <button className="btn btn-secondary btn-sm" onClick={handleDownloadImage}>
-                <Download size={16} /> Baixar Imagem (PNG)
+                <Download size={15} /> Baixar Imagem
               </button>
-              <button className="btn btn-primary btn-sm" onClick={handlePrint}>
-                <Printer size={16} /> Imprimir / PDF
+              <button className="btn btn-primary btn-sm" onClick={() => window.print()}>
+                <Printer size={15} /> Imprimir / PDF
               </button>
             </div>
           </div>
@@ -744,9 +741,9 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
           }
         `}</style>
 
-        <div style={{ marginBottom: 'var(--space-3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-            Exibindo escala com o nome dos voluntários escalados:
+        <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            Visualização da escala com o nome dos voluntários:
           </span>
           {loadingExport && <span style={{ fontSize: '0.85rem', color: 'var(--primary)' }}>Carregando trimestre...</span>}
         </div>
@@ -756,7 +753,7 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
           style={{ 
             backgroundColor: '#ffffff', 
             color: '#111827', 
-            padding: '24px', 
+            padding: '20px', 
             borderRadius: '8px', 
             border: '1px solid #e5e7eb',
             maxHeight: '60vh',
@@ -765,37 +762,36 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #2563eb', paddingBottom: '12px', marginBottom: '16px' }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: '#1e3a8a' }}>{title}</h2>
-              <p style={{ margin: '4px 0 0', color: '#4b5563', fontSize: '0.95rem', fontWeight: 600 }}>
+              <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#1e3a8a' }}>{title}</h2>
+              <p style={{ margin: '4px 0 0', color: '#4b5563', fontSize: '0.9rem', fontWeight: 600 }}>
                 {exportPeriod === 'mes' 
                   ? formatMonthYear(currentDate) 
                   : `Trimestre: ${formatMonthYear(currentDate)} a ${formatMonthYear(new Date(currentDate.getFullYear(), currentDate.getMonth() + 2, 1))}`}
               </p>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1e40af' }}>IASD Santo Afonso</div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e40af' }}>IASD Santo Afonso</div>
               <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Gestão de Escalas</div>
             </div>
           </div>
 
           {displayEvents.length === 0 ? (
-            <p style={{ textAlign: 'center', padding: '24px', color: '#6b7280' }}>Nenhum evento encontrado no período.</p>
+            <p style={{ textAlign: 'center', padding: '24px', color: '#6b7280' }}>Nenhum culto encontrado no período.</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left' }}>
-                    <th style={{ padding: '10px 12px', color: '#334155' }}>Data</th>
-                    <th style={{ padding: '10px 12px', color: '#334155', width: '70px' }}>Horário</th>
-                    <th style={{ padding: '10px 12px', color: '#334155' }}>Culto / Programação</th>
-                    {rolesToManage.map(rName => (
-                      <th key={rName} style={{ padding: '10px 12px', color: '#334155' }}>{rName}</th>
+                    <th style={{ padding: '8px 10px', color: '#334155', width: '110px' }}>Data</th>
+                    <th style={{ padding: '8px 10px', color: '#334155', width: '65px' }}>Horário</th>
+                    <th style={{ padding: '8px 10px', color: '#334155' }}>Culto / Programação</th>
+                    {rolesToManage.map(mRole => (
+                      <th key={mRole} style={{ padding: '8px 10px', color: '#334155' }}>{mRole}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {displayEvents.map((ev, idx) => {
-                    const evParts = displayParticipants[ev.id] || [];
                     const dateObj = new Date(ev.date + 'T12:00:00');
                     const weekday = dateObj.toLocaleDateString('pt-BR', { weekday: 'short' });
                     const capWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
@@ -803,21 +799,20 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
                     
                     return (
                       <tr key={ev.id} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                        <td style={{ padding: '10px 12px', fontWeight: 700, whiteSpace: 'nowrap', color: '#0f172a' }}>
+                        <td style={{ padding: '8px 10px', fontWeight: 700, whiteSpace: 'nowrap', color: '#0f172a' }}>
                           {capWeekday}, {dateStr}
                         </td>
-                        <td style={{ padding: '10px 12px', color: '#475569', whiteSpace: 'nowrap' }}>
-                          {formatTime(ev.start_time)}
+                        <td style={{ padding: '8px 10px', color: '#475569', whiteSpace: 'nowrap' }}>
+                          {safeFormatTime(ev.start_time)}
                         </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>
-                          {ev.title} {ev.status === 'draft' ? '(Rascunho)' : ''}
+                        <td style={{ padding: '8px 10px', fontWeight: 600, color: '#1e293b' }}>
+                          {ev.title}
                         </td>
-                        {rolesToManage.map(rName => {
-                          const rId = roleMap[rName];
-                          const parts = evParts.filter(p => p.role_id === rId);
-                          const names = parts.map(p => p.person?.name).filter(Boolean).join(', ');
+                        {rolesToManage.map(mRole => {
+                          const assigned = getAssignedPeople(ev.id, mRole, displayParticipants);
+                          const names = assigned.map(a => a.person?.name).filter(Boolean).join(', ');
                           return (
-                            <td key={rName} style={{ padding: '10px 12px' }}>
+                            <td key={mRole} style={{ padding: '8px 10px' }}>
                               {names ? (
                                 <span style={{ fontWeight: 600, color: '#0f172a' }}>{names}</span>
                               ) : (

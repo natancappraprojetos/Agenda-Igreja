@@ -11,7 +11,7 @@ interface PersonSelectProps {
   onChange: (personId: string | null, person?: Person | null) => void;
   placeholder?: string;
   label?: string;
-  roleId?: string; // Optional: filter by role
+  roleId?: string | string[]; // Optional: filter by role
   ministryId?: string; // Optional: filter by ministry
 }
 
@@ -45,14 +45,13 @@ export default function PersonSelect({ value, onChange, placeholder = 'Selecione
       `).eq('is_active', true).order('name');
       
       if (roleId) {
-        const { data: prData } = await supabase.from('person_roles').select('person_id').eq('role_id', roleId);
-        if (prData && prData.length > 0) {
-          const personIds = prData.map(pr => pr.person_id);
-          query = query.in('id', personIds);
-        } else if (!ministryId) { // if ministryId is also present, we might want to check both, but let's keep it simple
-          setPeople([]);
-          setLoading(false);
-          return;
+        const rIds = Array.isArray(roleId) ? roleId.filter(Boolean) : [roleId].filter(Boolean);
+        if (rIds.length > 0) {
+          const { data: prData } = await supabase.from('person_roles').select('person_id').in('role_id', rIds);
+          if (prData && prData.length > 0) {
+            const personIds = prData.map(pr => pr.person_id);
+            query = query.in('id', personIds);
+          }
         }
       }
       

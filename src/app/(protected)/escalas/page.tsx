@@ -28,7 +28,14 @@ export default function EscalasPage() {
   }, [canSeeAll, canSeeMusica, canSeeSonoplastia, canSeeDiaconato, canSeeEscolaSabatina]);
 
   // Set initial tab based on permissions
-  const [activeTab, setActiveTab] = useState<EscalaTab>('pregadores');
+  const [activeTab, setActiveTab] = useState<EscalaTab>(() => {
+    if (canSeeAll) return 'pregadores';
+    if (roles.includes('diacono')) return 'diaconato';
+    if (roles.includes('escola_sabatina')) return 'escola_sabatina';
+    if (roles.includes('musica')) return 'musica';
+    if (roles.includes('sonoplastia')) return 'sonoplastia';
+    return 'pregadores';
+  });
 
   useEffect(() => {
     if (availableTabs.length > 0 && !availableTabs.some(t => t.id === activeTab)) {
@@ -40,40 +47,59 @@ export default function EscalasPage() {
     <>
       <Header title="Central de Escalas" onMenuToggle={() => {}} />
 
-      <div className="app-content">
+      <div className="app-content" style={{ padding: 'var(--space-3) var(--space-2)' }}>
         <div style={{ maxWidth: 1000, margin: '0 auto' }}>
           
-          {/* Tabs for Departments - Shown if user has access to 2 or more departments */}
-          {availableTabs.length > 1 && (
-            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-6)', borderBottom: '1px solid var(--border-color)', paddingBottom: 'var(--space-2)', overflowX: 'auto' }}>
-              {availableTabs.map(tab => (
-                <button 
-                  key={tab.id}
-                  className={`btn ${activeTab === tab.id ? 'btn-primary' : 'btn-ghost'}`}
-                  onClick={() => setActiveTab(tab.id)}
-                >
-                  {tab.icon} {tab.label}
-                </button>
-              ))}
+          {/* Tabs for Departments - Prominent on mobile and desktop */}
+          {availableTabs.length > 1 ? (
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '16px',
+              overflowX: 'auto',
+              paddingBottom: '8px',
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none'
+            }}>
+              {availableTabs.map(tab => {
+                const isSelected = activeTab === tab.id;
+                return (
+                  <button 
+                    key={tab.id}
+                    className={`btn ${isSelected ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 16px',
+                      fontSize: '0.9rem',
+                      fontWeight: isSelected ? 700 : 500,
+                      borderRadius: '24px',
+                      boxShadow: isSelected ? '0 2px 8px rgba(37, 99, 235, 0.3)' : 'none'
+                    }}
+                    onClick={() => setActiveTab(tab.id)}
+                  >
+                    {tab.icon} {tab.label}
+                  </button>
+                );
+              })}
             </div>
-          )}
-
-          <div style={{ backgroundColor: 'var(--background-secondary)', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-6)' }}>
-            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-              <CalendarIcon size={20} color="var(--primary)" />
-              <span style={{ fontWeight: 600, color: 'var(--text)' }}>Visão de Liderança</span>
+          ) : availableTabs.length === 1 ? (
+            <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="badge badge-primary" style={{ fontSize: '0.9rem', padding: '6px 12px', borderRadius: '16px' }}>
+                {availableTabs[0].icon} {availableTabs[0].label}
+              </span>
             </div>
-            <p style={{ margin: 'var(--space-2) 0 0 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              Selecione o evento desejado no calendário abaixo para atribuir os voluntários ou clique em <strong>Tirar Escala</strong> para visualizar, imprimir ou copiar a escala do mês ou trimestre com todos os nomes.
-            </p>
-          </div>
+          ) : null}
 
           {activeTab === 'pregadores' && canSeeAll && (
             <EscalasCalendar 
               title="Escala de Pregadores" 
               icon={<BookOpen size={20} color="var(--primary)" />}
               eventTypesToInclude={['Culto', 'Programa Jovem', 'Desbravadores', 'Batismo', 'Evento Especial']}
-              rolesToManage={['Pregador(a)', 'Pregador']}
+              rolesToManage={['Pregador(a)']}
             />
           )}
 
@@ -100,7 +126,7 @@ export default function EscalasPage() {
               title="Escala de Diaconato" 
               icon={<Shield size={20} color="var(--primary)" />}
               eventTypesToInclude={['Culto', 'Programa Jovem', 'Desbravadores', 'Batismo', 'Evento Especial']}
-              rolesToManage={['Diácono/Diaconisa', 'Diácono', 'Diaconisa']}
+              rolesToManage={['Diácono / Diaconisa']}
             />
           )}
 
@@ -109,7 +135,7 @@ export default function EscalasPage() {
               title="Escala da Escola Sabatina" 
               icon={<GraduationCap size={20} color="var(--primary)" />}
               eventTypesToInclude={['Culto', 'Escola Sabatina', 'Programa Jovem', 'Evento Especial']}
-              rolesToManage={['Escola Sabatina', 'Professor', 'Diretor']}
+              rolesToManage={['Abertura da Escola Sabatina']}
             />
           )}
 

@@ -549,7 +549,7 @@ export default function AgendaPage() {
                                        const dRoles = ev.participants?.filter(p => p.role?.name?.toLowerCase().includes('diácono') || p.role?.name?.toLowerCase().includes('diacon') || p.role?.name?.toLowerCase().includes('oferta')) || [];
                                        text = dRoles.map(r => r.person?.name).filter(Boolean).join(', ') || 'A Definir';
                                      } else if (selectedMinistry === 'escola_sabatina') {
-                                       const esRoles = ev.participants?.filter(p => p.role?.name?.toLowerCase().includes('sabatina') || p.role?.name?.toLowerCase().includes('professor') || p.role?.name?.toLowerCase().includes('diretor')) || [];
+                                       const esRoles = ev.participants?.filter(p => p.role?.name?.toLowerCase().includes('sabatina') || p.role?.name?.toLowerCase().includes('abertura')) || [];
                                        text = esRoles.map(r => r.person?.name).filter(Boolean).join(', ') || 'A Definir';
                                      }
 
