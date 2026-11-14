@@ -1,14 +1,15 @@
 'use client';
 import Link from 'next/link';
-import { Bell } from 'lucide-react';
+import { Bell, ArrowLeft } from 'lucide-react';
 import { useUnreadNotificationsCount } from '@/lib/hooks/useUnreadNotificationsCount';
 interface HeaderProps {
   title: string;
-  onMenuToggle: () => void;
+  onMenuToggle?: () => void;
+  onBack?: () => void;
   children?: React.ReactNode;
 }
 
-export default function Header({ title, onMenuToggle, children }: HeaderProps) {
+export default function Header({ title, onMenuToggle, onBack, children }: HeaderProps) {
   const notificationsData = useUnreadNotificationsCount();
 
   const handleToggle = () => {
@@ -27,6 +28,25 @@ export default function Header({ title, onMenuToggle, children }: HeaderProps) {
         <button className="header-menu-btn" onClick={handleToggle} aria-label="Menu">
           ☰
         </button>
+        {onBack && (
+          <button 
+            type="button" 
+            className="btn btn-ghost btn-sm" 
+            onClick={onBack}
+            aria-label="Voltar"
+            style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '4px', 
+              padding: '6px 10px',
+              marginRight: '6px'
+            }}
+            title="Voltar"
+          >
+            <ArrowLeft size={18} />
+            <span className="hide-on-mobile">Voltar</span>
+          </button>
+        )}
         <h1 className="header-title">{title}</h1>
       </div>
       <div className="header-right">

@@ -10,6 +10,7 @@ import PersonSelect from '@/components/ui/PersonSelect';
 import { calculateLiturgyTimes, formatTime } from '@/lib/utils/liturgy-calculator';
 import { formatDateShort } from '@/lib/utils/dates';
 import html2canvas from 'html2canvas';
+import Header from '@/components/layout/Header';
 
 interface LocalLiturgyItem {
   id?: string;
@@ -804,28 +805,25 @@ export default function LiturgyBuilderPage() {
   const isTwoColumns = items.length > 10;
 
   return (
-    <div className="app-layout">
-      <header className="app-header">
-        <div className="app-header-left">
-          <button className="btn btn-ghost btn-sm" onClick={() => router.back()}>
-            ← Voltar
+    <>
+      <Header title="Gerador de Liturgia" onBack={() => router.back()} onMenuToggle={() => {}}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button className="btn btn-outline btn-sm" onClick={handleSave} disabled={saving} title="Salvar Liturgia">
+            {saving ? 'Salvando...' : '💾'}
+            <span className="hide-on-mobile"> Salvar</span>
           </button>
-          <h1 className="app-title">Gerador de Liturgia</h1>
-        </div>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-          <button className="btn btn-outline btn-sm" onClick={handleSave} disabled={saving}>
-            {saving ? 'Salvando...' : '💾 Salvar'}
+          <button className={`btn btn-${copied ? 'success' : 'primary'} btn-sm`} onClick={copyToWhatsApp} title="Copiar para WhatsApp">
+            {copied ? '✅' : '📱'}
+            <span className="hide-on-mobile"> {copied ? 'Copiado!' : 'Copiar WhatsApp'}</span>
           </button>
-          <button className={`btn btn-${copied ? 'success' : 'primary'} btn-sm`} onClick={copyToWhatsApp}>
-            {copied ? '✅ Copiado!' : '📱 Copiar WhatsApp'}
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={handleDownloadImage} disabled={isGeneratingImage}>
-            📸 {isGeneratingImage ? 'Gerando...' : 'Imagem WhatsApp'}
+          <button className="btn btn-secondary btn-sm" onClick={handleDownloadImage} disabled={isGeneratingImage} title="Gerar Imagem para WhatsApp">
+            📸
+            <span className="hide-on-mobile"> {isGeneratingImage ? 'Gerando...' : 'Imagem WhatsApp'}</span>
           </button>
         </div>
-      </header>
+      </Header>
 
-      <div className="app-content" style={{ maxWidth: '800px', margin: '0 auto', width: '100%', paddingBottom: '100px' }}>
+      <div className="app-content" style={{ maxWidth: '1050px', margin: '0 auto', width: '100%', paddingBottom: '100px' }}>
         <div className="card mb-4" style={{ backgroundColor: 'var(--primary)', color: 'white' }}>
           <h2 style={{ fontSize: '1.2rem', margin: '0 0 var(--space-2) 0' }}>{event.title}</h2>
           <p style={{ margin: 0, opacity: 0.9 }}>{formatDateShort(event.date)} • {formatTime(event.start_time)}</p>
@@ -913,7 +911,7 @@ export default function LiturgyBuilderPage() {
                 {formatTime(item.calculated_time)}
               </div>
 
-              <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                   <input 
                     type="text" 
@@ -921,10 +919,10 @@ export default function LiturgyBuilderPage() {
                     value={item.title} 
                     onChange={(e) => handleUpdateItem(idx, 'title', e.target.value)}
                     placeholder="Título do Item"
-                    style={{ fontWeight: 600, flex: 1 }}
+                    style={{ fontWeight: 600, flex: 1, minWidth: 0 }}
                   />
                   
-                  <div style={{ width: '90px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ width: '90px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <input 
                       type="number" 
                       className="form-input" 
@@ -1073,6 +1071,27 @@ export default function LiturgyBuilderPage() {
               + Adicionar Primeiro Item
             </button>
           )}
+
+          {items.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', gap: '12px', flexWrap: 'wrap' }}>
+              <button 
+                type="button"
+                className="btn btn-outline" 
+                style={{ padding: '10px 16px', borderStyle: 'dashed', display: 'flex', alignItems: 'center', gap: '8px' }} 
+                onClick={() => addItem(items.length - 1)}
+              >
+                ➕ Adicionar Novo Item à Liturgia
+              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="btn btn-outline btn-sm" onClick={handleSave} disabled={saving}>
+                  {saving ? 'Salvando...' : '💾 Salvar Liturgia'}
+                </button>
+                <button className={`btn btn-${copied ? 'success' : 'primary'} btn-sm`} onClick={copyToWhatsApp}>
+                  {copied ? '✅ Copiado!' : '📱 Copiar WhatsApp'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1145,6 +1164,6 @@ export default function LiturgyBuilderPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
