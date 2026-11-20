@@ -32,8 +32,11 @@ export function getMonthShort(month: number): string {
 /**
  * Format: "Sábado, 15 de Agosto de 2026"
  */
-export function formatDateLong(date: Date): string {
-  return `${getWeekdayName(date)}, ${date.getDate()} de ${getMonthName(date.getMonth())} de ${date.getFullYear()}`;
+export function formatDateLong(date: Date | string): string {
+  if (!date) return '';
+  const d = typeof date === 'string' ? new Date(date.includes('T') ? date : date + 'T00:00:00') : date;
+  if (isNaN(d.getTime())) return String(date);
+  return `${getWeekdayName(d)}, ${d.getDate()} de ${getMonthName(d.getMonth())} de ${d.getFullYear()}`;
 }
 
 /**

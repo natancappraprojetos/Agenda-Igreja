@@ -56,7 +56,7 @@ function formatName(name: string): string {
   }
 
   const parts = trimmed.split(/\s+/);
-  
+
   // 3. Se tiver até 3 palavras (ex: 'Sheila de Matos', 'Darci de Jesus', 'Ana Paula Souza') -> nunca cortar!
   if (parts.length <= 3) {
     return fixCapitalization(trimmed);
@@ -70,7 +70,7 @@ function formatName(name: string): string {
   const prepositions = ['de', 'da', 'do', 'das', 'dos', 'e'];
   const firstName = parts[0];
   const secondName = parts[1];
-  
+
   // Nome composto tradicional (ex: João Pedro, Ana Paula, Maria Eduarda)
   const compoundFirst = ['pedro', 'paulo', 'maria', 'eduarda', 'clara', 'paula', 'luiza', 'luiz', 'lucas', 'vitor', 'victor', 'felipe', 'gabriel', 'henrique', 'guilherme', 'arthur', 'miguel', 'alice', 'beatriz', 'sophia', 'laura', 'valentina'];
   const hasCompound = compoundFirst.includes(secondName.toLowerCase()) && !prepositions.includes(secondName.toLowerCase());
@@ -99,28 +99,40 @@ function isCongregationalPraise(title: string): boolean {
   return t.includes('congregaciona') || t.includes('momento de louvor') || t.includes('cânticos') || t.includes('canticos');
 }
 
+function isMusicalItem(title: string): boolean {
+  const t = (title || '').toLowerCase();
+  return isCongregationalPraise(t) || 
+         t.includes('louvor') || 
+         t.includes('cântico') || 
+         t.includes('cantico') || 
+         t.includes('música') || 
+         t.includes('musica') || 
+         t.includes('hino') || 
+         t.includes('solo');
+}
+
 export const isNoOne = (item: LocalLiturgyItem) => {
   const pName = (item.person_name || '').trim().toLowerCase();
   const notes = (item.notes || '').trim().toLowerCase();
   const singers = (item.list_data?.singers || '').trim().toLowerCase();
-  return pName === 'não haverá' || 
-         pName === 'sem responsável' || 
-         pName === 'ninguém' || 
-         pName === 'dispensado' || 
-         notes === 'sem_responsavel' ||
-         singers === 'não haverá' ||
-         singers === 'sem responsável' ||
-         singers === 'ninguém' ||
-         singers === 'dispensado';
+  return pName === 'não haverá' ||
+    pName === 'sem responsável' ||
+    pName === 'ninguém' ||
+    pName === 'dispensado' ||
+    notes === 'sem_responsavel' ||
+    singers === 'não haverá' ||
+    singers === 'sem responsável' ||
+    singers === 'ninguém' ||
+    singers === 'dispensado';
 };
 
 export const isItemPending = (item: LocalLiturgyItem) => {
   if (isNoOne(item)) return false;
-  
+
   if (item.is_list) {
     return !item.list_data?.singers?.trim();
   }
-  
+
   return !item.person_id && !item.person_name?.trim();
 };
 
@@ -128,7 +140,7 @@ export default function LiturgyBuilderPage() {
   const params = useParams();
   const eventId = params.id as string;
   const router = useRouter();
-  
+
   const [event, setEvent] = useState<any>(null);
   const [liturgyId, setLiturgyId] = useState<string | null>(null);
   const [items, setItems] = useState<LocalLiturgyItem[]>([]);
@@ -137,7 +149,7 @@ export default function LiturgyBuilderPage() {
   const [copied, setCopied] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  
+
   const supabase = createClient();
   const { addToast } = useToast();
   const { user } = useAuth();
@@ -170,7 +182,7 @@ export default function LiturgyBuilderPage() {
         `)
         .eq('id', eventId)
         .single();
-        
+
       if (evError) throw evError;
       setEvent(evData);
 
@@ -189,7 +201,7 @@ export default function LiturgyBuilderPage() {
           .select('*, person:people(name)')
           .eq('liturgy_id', litData.id)
           .order('order_index');
-          
+
         if (itemsData && itemsData.length > 0) {
           const findPerson = (roleNames: string[]) => {
             const p = evData.participants?.find((p: any) => roleNames.some(rn => p.role?.name?.toLowerCase()?.includes(rn.toLowerCase())));
@@ -238,7 +250,7 @@ export default function LiturgyBuilderPage() {
             let isList = false;
             let listData = { singers: '', songs: ['', ''] };
             let textNotes = i.notes || '';
-            
+
             if (textNotes.trim().startsWith('{') && textNotes.trim().endsWith('}')) {
               try {
                 const parsed = JSON.parse(textNotes);
@@ -249,39 +261,39 @@ export default function LiturgyBuilderPage() {
                   };
                   isList = true;
                 }
-              } catch(e) {}
+              } catch (e) { }
             } else if (isCongregationalPraise(t)) {
               isList = true;
             }
-            
+
             if (isList && (!listData.singers || listData.singers === '')) {
-               const leaderNameFull = findPeopleNames(['Líder de Louvor', 'Música']) || evData.worship_leader?.name;
-               const leaderName = leaderNameFull ? leaderNameFull.split(' ')[0] : null;
-               
-               const teamNamesFull = evData.participants?.filter((p: any) => {
-                  const rn = p.role?.name?.toLowerCase() || '';
-                  return rn.includes('congregacional') || rn === 'vocal' || rn.includes('equipe');
-               }).map((p: any) => p.person?.name).filter(Boolean);
-               
-               const teamNames = teamNamesFull?.length > 0 ? teamNamesFull.map((n: string) => n.split(' ')[0]).join(', ') : null;
-               
-               const parts = [];
-               if (leaderName) parts.push(`Responsável: ${leaderName}`);
-               if (teamNames) parts.push(`Equipe: ${teamNames}`);
-               listData.singers = parts.join(' | ');
+              const leaderNameFull = findPeopleNames(['Líder de Louvor', 'Música']) || evData.worship_leader?.name;
+              const leaderName = leaderNameFull ? leaderNameFull.split(' ')[0] : null;
+
+              const teamNamesFull = evData.participants?.filter((p: any) => {
+                const rn = p.role?.name?.toLowerCase() || '';
+                return rn.includes('congregacional') || rn === 'vocal' || rn.includes('equipe');
+              }).map((p: any) => p.person?.name).filter(Boolean);
+
+              const teamNames = teamNamesFull?.length > 0 ? teamNamesFull.map((n: string) => n.split(' ')[0]).join(', ') : null;
+
+              const parts = [];
+              if (leaderName) parts.push(`Responsável: ${leaderName}`);
+              if (teamNames) parts.push(`Equipe: ${teamNames}`);
+              listData.singers = parts.join(' | ');
             } else if ((t.includes('louvor especial') || t.includes('música especial') || t.includes('mensagem musical') || t.includes('solo')) && (!pId || pId === evData.worship_leader_id)) {
-               if (solo) {
-                  pId = solo.id;
-                  pName = solo.name;
-               } else if (pId === evData.worship_leader_id) {
-                  pId = null;
-                  pName = null;
-               }
+              if (solo) {
+                pId = solo.id;
+                pName = solo.name;
+              } else if (pId === evData.worship_leader_id) {
+                pId = null;
+                pName = null;
+              }
             } else if (t.includes('louvor final')) {
-               if (solo && (!pId || pId === evData.worship_leader_id)) {
-                  pId = solo.id;
-                  pName = solo.name;
-               }
+              if (solo && (!pId || pId === evData.worship_leader_id)) {
+                pId = solo.id;
+                pName = solo.name;
+              }
             }
 
             return {
@@ -305,7 +317,7 @@ export default function LiturgyBuilderPage() {
 
       // 3. AUTO-GENERATE IF EMPTY
       await generateTemplate(evData, litData?.id);
-      
+
     } catch (err) {
       console.error("LITURGIA ERROR", JSON.stringify(err, Object.getOwnPropertyNames(err)));
       addToast({ type: 'error', title: 'Erro ao carregar dados' });
@@ -321,22 +333,22 @@ export default function LiturgyBuilderPage() {
   const generateTemplate = async (ev: any, existingLiturgyId?: string, forcedTemplateType?: string) => {
     const title = (ev.title || '').toLowerCase();
     const date = new Date(ev.date + 'T00:00:00');
-    const dayOfWeek = date.getDay(); 
-    
-    let isEvangelistico = forcedTemplateType === 'evangelistico' || 
+    const dayOfWeek = date.getDay();
+
+    let isEvangelistico = forcedTemplateType === 'evangelistico' ||
       (!forcedTemplateType && (title.includes('evang') || title.includes('esperança') || title.includes('esperanca') || title.includes('semana') || title.includes('conferência') || title.includes('conferencia')));
-    
+
     let isSantaCeia = forcedTemplateType === 'santaceia' ||
       (!forcedTemplateType && !isEvangelistico && (title.includes('santa ceia') || title.includes('ceia')));
 
-    let isSabado = forcedTemplateType === 'sabado' || 
+    let isSabado = forcedTemplateType === 'sabado' ||
       (!forcedTemplateType && !isEvangelistico && !isSantaCeia && (title.includes('sáb') || title.includes('sabado') || dayOfWeek === 6));
 
     let isQuarta = forcedTemplateType === 'quarta' ||
       (!forcedTemplateType && !isEvangelistico && !isSantaCeia && (title.includes('quarta') || dayOfWeek === 3));
 
     let initialItems: any[] = [];
-    
+
     const findPerson = (roleNames: string[]) => {
       const p = ev.participants?.find((p: any) => roleNames.some(rn => p.role?.name?.toLowerCase()?.includes(rn.toLowerCase())));
       return p ? { id: p.person_id, name: p.person?.name } : null;
@@ -430,7 +442,7 @@ export default function LiturgyBuilderPage() {
       ev.sub_events.forEach((se: any) => {
         const typeName = se.event_types?.name?.toLowerCase() || '';
         const person = se.responsible_person || (se.ministries ? { name: se.ministries.name } : null);
-        
+
         if (typeName.includes('batismo')) {
           // Votos Batismais before Louvores Congregacionais
           const louvorCongIndex = initialItems.findIndex(i => i.title.toLowerCase().includes('louvores congregacionais') || i.title.toLowerCase().includes('louvor inicial'));
@@ -441,11 +453,11 @@ export default function LiturgyBuilderPage() {
             duration: 5,
             person
           });
-          
+
           // Batismo after Sermão / Pregação, before next Louvor Especial
           const sermaoIndex = initialItems.findIndex(i => i.title.toLowerCase().includes('sermão') || i.title.toLowerCase().includes('pregação'));
           let insertBatismoIdx = initialItems.length;
-          
+
           if (sermaoIndex !== -1) {
             insertBatismoIdx = sermaoIndex + 1; // Immediately after sermão
           } else {
@@ -453,23 +465,23 @@ export default function LiturgyBuilderPage() {
             const finalPrayerIndex = initialItems.findIndex(i => i.title.toLowerCase().includes('oração final'));
             if (finalPrayerIndex !== -1) insertBatismoIdx = finalPrayerIndex;
           }
-          
+
           initialItems.splice(insertBatismoIdx, 0, {
             emoji: '💧',
             title: `Cerimônia de Batismo: ${se.title}`,
             duration: 10,
             person
           });
-          
+
         } else {
           // Other sub-events (Comissão, Ensaio, etc) go before Oração Final
           const finalPrayerIndex = initialItems.findIndex(i => i.title.toLowerCase().includes('oração final'));
           const insertIndex = finalPrayerIndex !== -1 ? finalPrayerIndex : initialItems.length;
-          
+
           let emoji = '📅';
           if (typeName.includes('comissão')) emoji = '📋';
           if (typeName.includes('ensaio')) emoji = '🎵';
-          
+
           initialItems.splice(insertIndex, 0, {
             emoji,
             title: `${se.event_types?.name || 'Evento'}: ${se.title}`,
@@ -496,17 +508,17 @@ export default function LiturgyBuilderPage() {
         duration: 5,
         person: { id: bp.person_id, name: bp.person?.name }
       });
-      
+
       const sermaoIndex = initialItems.findIndex(i => i.title.toLowerCase().includes('sermão') || i.title.toLowerCase().includes('pregação'));
       let insertBatismoIdx = initialItems.length;
-      
+
       if (sermaoIndex !== -1) {
         insertBatismoIdx = sermaoIndex + 1;
       } else {
         const finalPrayerIndex = initialItems.findIndex(i => i.title.toLowerCase().includes('oração final'));
         if (finalPrayerIndex !== -1) insertBatismoIdx = finalPrayerIndex;
       }
-      
+
       initialItems.splice(insertBatismoIdx, 0, {
         emoji: '💧',
         title: `Cerimônia de Batismo: ${nameToCheck}`,
@@ -529,17 +541,17 @@ export default function LiturgyBuilderPage() {
           duration: 5,
           person: null
         });
-        
+
         const sermaoIndex = initialItems.findIndex(i => i.title.toLowerCase().includes('sermão') || i.title.toLowerCase().includes('pregação'));
         let insertBatismoIdx = initialItems.length;
-        
+
         if (sermaoIndex !== -1) {
           insertBatismoIdx = sermaoIndex + 1;
         } else {
           const finalPrayerIndex = initialItems.findIndex(i => i.title.toLowerCase().includes('oração final'));
           if (finalPrayerIndex !== -1) insertBatismoIdx = finalPrayerIndex;
         }
-        
+
         initialItems.splice(insertBatismoIdx, 0, {
           emoji: '💧',
           title: `Cerimônia de Batismo`,
@@ -562,25 +574,25 @@ export default function LiturgyBuilderPage() {
 
     const newItems: LocalLiturgyItem[] = initialItems.map((item, idx) => {
       const isList = Boolean(item.is_list);
-      
+
       let singersStr = '';
       if (isList) {
-         const leaderNameFull = findPeopleNames(['Líder de Louvor', 'Música']) || ev.worship_leader?.name;
-         const leaderName = leaderNameFull ? leaderNameFull.split(' ')[0] : null;
-         
-         const teamNamesFull = ev.participants?.filter((p: any) => {
-            const rn = p.role?.name?.toLowerCase() || '';
-            return rn.includes('congregacional') || rn === 'vocal' || rn.includes('equipe');
-         }).map((p: any) => p.person?.name).filter(Boolean);
-         
-         const teamNames = teamNamesFull?.length > 0 ? teamNamesFull.map((n: string) => n.split(' ')[0]).join(', ') : null;
-         
-         const parts = [];
-         if (leaderName) parts.push(`Responsável: ${leaderName}`);
-         if (teamNames) parts.push(`Equipe: ${teamNames}`);
-         singersStr = parts.join(' | ');
+        const leaderNameFull = findPeopleNames(['Líder de Louvor', 'Música']) || ev.worship_leader?.name;
+        const leaderName = leaderNameFull ? leaderNameFull.split(' ')[0] : null;
+
+        const teamNamesFull = ev.participants?.filter((p: any) => {
+          const rn = p.role?.name?.toLowerCase() || '';
+          return rn.includes('congregacional') || rn === 'vocal' || rn.includes('equipe');
+        }).map((p: any) => p.person?.name).filter(Boolean);
+
+        const teamNames = teamNamesFull?.length > 0 ? teamNamesFull.map((n: string) => n.split(' ')[0]).join(', ') : null;
+
+        const parts = [];
+        if (leaderName) parts.push(`Responsável: ${leaderName}`);
+        if (teamNames) parts.push(`Equipe: ${teamNames}`);
+        singersStr = parts.join(' | ');
       }
-      
+
       return {
         title: item.title,
         duration_minutes: item.duration,
@@ -596,7 +608,7 @@ export default function LiturgyBuilderPage() {
 
     const calculated = calculateLiturgyTimes(newItems, ev.start_time) as LocalLiturgyItem[];
     setItems(calculated);
-    
+
     // Save to DB silently
     saveToDb(lid!, calculated);
   };
@@ -606,10 +618,10 @@ export default function LiturgyBuilderPage() {
     const toInsert = currentItems.map(i => {
       let finalNotes = i.notes || null;
       if (i.is_list && i.list_data) {
-         const validSongs = i.list_data.songs.filter(s => s.trim());
-         if (validSongs.length > 0 || i.list_data.singers.trim()) {
-           finalNotes = JSON.stringify({ singers: i.list_data.singers, songs: validSongs });
-         }
+        const validSongs = i.list_data.songs.filter(s => s.trim());
+        if (validSongs.length > 0 || i.list_data.singers.trim()) {
+          finalNotes = JSON.stringify({ singers: i.list_data.singers, songs: validSongs });
+        }
       }
       return {
         liturgy_id: lid,
@@ -621,7 +633,7 @@ export default function LiturgyBuilderPage() {
         notes: finalNotes
       };
     });
-    
+
     try {
       await saveLiturgyItemsAdmin(lid, toInsert);
     } catch (err) {
@@ -636,7 +648,7 @@ export default function LiturgyBuilderPage() {
     newItems[index] = {
       ...current,
       is_list: nextIsList,
-      list_data: nextIsList 
+      list_data: nextIsList
         ? (current.list_data?.songs?.length ? current.list_data : { singers: current.person_name || '', songs: ['', ''] })
         : current.list_data
     };
@@ -656,7 +668,7 @@ export default function LiturgyBuilderPage() {
   const handleUpdateItem = (index: number, field: keyof LocalLiturgyItem, value: any, extraPersonName?: string) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
-    
+
     // Auto toggle list mode based on title only if it's explicitly congregational praise
     if (field === 'title') {
       const t = (value || '').toLowerCase();
@@ -710,17 +722,17 @@ export default function LiturgyBuilderPage() {
   const moveItem = (index: number, direction: 'up' | 'down') => {
     if (direction === 'up' && index === 0) return;
     if (direction === 'down' && index === items.length - 1) return;
-    
+
     const newItems = [...items];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    
+
     const temp = newItems[index];
     newItems[index] = newItems[targetIndex];
     newItems[targetIndex] = temp;
-    
+
     // update order_index
     newItems.forEach((item, idx) => item.order_index = idx + 1);
-    
+
     const calculated = calculateLiturgyTimes(newItems, event.start_time) as LocalLiturgyItem[];
     setItems(calculated);
   };
@@ -781,7 +793,7 @@ export default function LiturgyBuilderPage() {
     const header = `*Liturgia do Culto de ${event.title} – ${formatDateShort(event.date)}*\n`;
     const soundFirstName = event.sound_person?.name ? event.sound_person.name.split(' ')[0] : '';
     const sound = soundFirstName ? `🖥️ Sonoplastia: ${soundFirstName}\n\n` : `🖥️ Sonoplastia: ---\n\n`;
-    
+
     const body = items.map(item => {
       // Determine emoji fallback based on text
       let emoji = item.emoji;
@@ -800,10 +812,10 @@ export default function LiturgyBuilderPage() {
         else if (titleLower.includes('batismo')) emoji = '💧';
         else emoji = '🔸';
       }
-      
+
       const formattedPerson = item.person_name ? formatName(item.person_name) : '';
       let personStr = formattedPerson ? ` (${formattedPerson})` : '';
-      
+
       let notesStr = '';
       if (item.is_list && item.list_data) {
         if (item.list_data.singers) {
@@ -823,10 +835,10 @@ export default function LiturgyBuilderPage() {
       } else if (item.notes) {
         notesStr = `\n▪️ ${item.notes.replace(/\n/g, '\n▪️ ')}`;
       }
-      
+
       return `${emoji} ${formatTime(item.calculated_time)} – ${item.title}${personStr}${notesStr}`;
     }).join('\n');
-    
+
     const text = header + sound + body;
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -865,11 +877,10 @@ export default function LiturgyBuilderPage() {
 
 
   const isTwoColumns = items.length > 10;
-  const pendingCount = items.filter(isItemPending).length;
 
   return (
     <>
-      <Header title="Gerador de Liturgia" onBack={() => router.back()} onMenuToggle={() => {}}>
+      <Header title="Gerador de Liturgia" onBack={() => router.back()} onMenuToggle={() => { }}>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <button className="btn btn-outline btn-sm" onClick={handleSave} disabled={saving} title="Salvar Liturgia">
             {saving ? 'Salvando...' : '💾'}
@@ -887,24 +898,9 @@ export default function LiturgyBuilderPage() {
       </Header>
 
       <div className="app-content" style={{ maxWidth: '1050px', margin: '0 auto', width: '100%', paddingBottom: '100px' }}>
-        <div className="card mb-4" style={{ backgroundColor: 'var(--primary)', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <div>
-            <h2 style={{ fontSize: '1.25rem', margin: '0 0 var(--space-1) 0', fontWeight: 700 }}>{event.title}</h2>
-            <p style={{ margin: 0, opacity: 0.9 }}>{formatDateShort(event.date)} • {formatTime(event.start_time)}</p>
-          </div>
-          <div>
-            {pendingCount > 0 ? (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '20px', backgroundColor: '#fee2e2', color: '#991b1b', fontWeight: 700, fontSize: '0.85rem', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
-                <span>⚠️</span>
-                <span>{pendingCount} {pendingCount === 1 ? 'item pendente' : 'itens pendentes'}</span>
-              </div>
-            ) : items.length > 0 ? (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '20px', backgroundColor: '#dcfce7', color: '#166534', fontWeight: 700, fontSize: '0.85rem', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
-                <span>✅</span>
-                <span>Liturgia 100% Definida</span>
-              </div>
-            ) : null}
-          </div>
+        <div className="card mb-4" style={{ backgroundColor: 'var(--primary)', color: 'white' }}>
+          <h2 style={{ fontSize: '1.2rem', margin: '0 0 var(--space-2) 0' }}>{event.title}</h2>
+          <p style={{ margin: 0, opacity: 0.9 }}>{formatDateShort(event.date)} • {formatTime(event.start_time)}</p>
         </div>
 
         {/* Seletor Rápido de Modelos */}
@@ -912,8 +908,8 @@ export default function LiturgyBuilderPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#475569' }}>📋 Carregar Modelo:</span>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn btn-outline btn-sm"
                 style={{ fontSize: '0.8rem', padding: '4px 10px', backgroundColor: '#ffffff' }}
                 onClick={() => handleApplyTemplate('evangelistico')}
@@ -921,8 +917,8 @@ export default function LiturgyBuilderPage() {
               >
                 ✨ Culto Evangelístico
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn btn-outline btn-sm"
                 style={{ fontSize: '0.8rem', padding: '4px 10px', backgroundColor: '#ffffff' }}
                 onClick={() => handleApplyTemplate('santaceia')}
@@ -930,8 +926,8 @@ export default function LiturgyBuilderPage() {
               >
                 🍞 Santa Ceia (Sábado)
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn btn-outline btn-sm"
                 style={{ fontSize: '0.8rem', padding: '4px 10px', backgroundColor: '#ffffff' }}
                 onClick={() => handleApplyTemplate('sabado')}
@@ -939,8 +935,8 @@ export default function LiturgyBuilderPage() {
               >
                 ⛪ Sábado Normal
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn btn-outline btn-sm"
                 style={{ fontSize: '0.8rem', padding: '4px 10px', backgroundColor: '#ffffff' }}
                 onClick={() => handleApplyTemplate('quarta')}
@@ -948,8 +944,8 @@ export default function LiturgyBuilderPage() {
               >
                 🙏 Quarta-feira
               </button>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="btn btn-outline btn-sm"
                 style={{ fontSize: '0.8rem', padding: '4px 10px', backgroundColor: '#ffffff' }}
                 onClick={() => handleApplyTemplate('domingo')}
@@ -965,6 +961,7 @@ export default function LiturgyBuilderPage() {
           {items.map((item, idx) => {
             const isPending = isItemPending(item);
             const isNone = isNoOne(item);
+            const isMusical = isMusicalItem(item.title);
 
             return (
               <div 
@@ -1105,42 +1102,49 @@ export default function LiturgyBuilderPage() {
                     </div>
                   </div>
 
-                  {/* Alternador de Modo: Individual vs Lista de Hinos */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '2px 0' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                      {item.is_list ? '🎤 Modo: Equipe de Louvor (Lista de Hinos)' : '👤 Modo: Pessoa / Cantor Individual'}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      style={{ fontSize: '0.72rem', padding: '2px 6px', color: 'var(--primary)', height: 'auto', minHeight: 'auto' }}
-                      onClick={() => handleToggleListMode(idx)}
-                      title="Alternar entre modo Cantor Individual ou Lista de Hinos"
-                    >
-                      {item.is_list ? '👤 Mudar para Cantor Individual' : '🎤 Mudar para Lista de Hinos'}
-                    </button>
-                  </div>
+                  {/* Alternador de Modo: APENAS PARA ITENS DE LOUVOR/MÚSICA */}
+                  {(isMusical || item.is_list) && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '2px 0' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        {item.is_list ? '🎤 Modo: Equipe de Louvor (Lista de Hinos)' : '👤 Modo: Cantor(a) Individual'}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        style={{ fontSize: '0.72rem', padding: '2px 6px', color: 'var(--primary)', height: 'auto', minHeight: 'auto' }}
+                        onClick={() => handleToggleListMode(idx)}
+                        title="Alternar entre modo Cantor Individual ou Lista de Hinos"
+                      >
+                        {item.is_list ? '👤 Mudar para Cantor Individual' : '🎤 Mudar para Lista de Hinos'}
+                      </button>
+                    </div>
+                  )}
 
                   {!item.is_list && (
                     <div style={{ display: 'flex', gap: 'var(--space-2)', flexDirection: 'column' }}>
                       <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: isPending ? 'var(--danger-dark, #b91c1c)' : 'var(--text-secondary)', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span>{isPending ? '⚠️ Escolha o Responsável:' : 'Responsável (Opcional)'}</span>
-                          {!item.person_id && item.id && (
+                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: isPending ? 'var(--danger-dark, #b91c1c)' : 'var(--text-secondary)', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                          <span>
+                            {isPending 
+                              ? (isMusical ? '⚠️ Escolha o Cantor(a) / Grupo:' : '⚠️ Escolha o Responsável:') 
+                              : (isMusical ? 'Cantor(a) / Responsável' : 'Responsável (Opcional)')}
+                          </span>
+                          {item.id && (
                             <button
+                              type="button"
                               className="btn btn-success btn-sm"
-                              style={{ padding: '2px 8px', fontSize: '0.75rem' }}
-                              title="Copiar Link de Preenchimento para enviar"
+                              style={{ padding: '3px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: '6px' }}
+                              title="Copiar Link de Convite exclusivo para enviar à pessoa"
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 const link = `${window.location.origin}/convite/liturgia/${item.id}`;
                                 await navigator.clipboard.writeText(link);
                                 setCopiedId(item.id || null);
-                                addToast({ type: 'success', title: 'Link copiado!' });
+                                addToast({ type: 'success', title: 'Link de convite copiado!' });
                                 setTimeout(() => setCopiedId(null), 3000);
                               }}
                             >
-                              {copiedId === item.id ? '✅ Copiado' : '🔗 Copiar Link'}
+                              {copiedId === item.id ? '✅ Link Copiado!' : '🔗 Copiar Link'}
                             </button>
                           )}
                         </label>
@@ -1148,7 +1152,7 @@ export default function LiturgyBuilderPage() {
                           <PersonSelect 
                             value={item.person_id || ''} 
                             onChange={(val, person) => handleUpdateItem(idx, 'person_id', val, person?.name || '')}
-                            placeholder={item.person_name ? item.person_name : (isNone ? 'Não haverá responsável' : 'Buscar pessoa...')}
+                            placeholder={item.person_name ? item.person_name : (isNone ? 'Não haverá responsável' : (isMusical ? 'Buscar cantor(a)...' : 'Buscar pessoa...'))}
                           />
                         </div>
                         {!item.person_id && item.person_name && !isNone && (
@@ -1173,23 +1177,24 @@ export default function LiturgyBuilderPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)', border: isPending ? '1px solid var(--danger-light, #fca5a5)' : '1px solid var(--border)' }}>
 
                       <div style={{ marginBottom: '8px' }}>
-                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: isPending ? 'var(--danger-dark, #b91c1c)' : 'var(--text-secondary)', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: isPending ? 'var(--danger-dark, #b91c1c)' : 'var(--text-secondary)', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                           <span>{isPending ? '⚠️ Cantores (Pendente):' : 'Cantores (Equipe que vai puxar os hinos)'}</span>
                           {item.id && (
                             <button
+                              type="button"
                               className="btn btn-success btn-sm"
-                              style={{ padding: '2px 8px', fontSize: '0.75rem' }}
-                              title="Copiar Link de Preenchimento para enviar à equipe"
+                              style={{ padding: '3px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: '6px' }}
+                              title="Copiar Link de Convite exclusivo para enviar à equipe"
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 const link = `${window.location.origin}/convite/liturgia/${item.id}`;
                                 await navigator.clipboard.writeText(link);
                                 setCopiedId(item.id || null);
-                                addToast({ type: 'success', title: 'Link copiado!' });
+                                addToast({ type: 'success', title: 'Link de convite copiado!' });
                                 setTimeout(() => setCopiedId(null), 3000);
                               }}
                             >
-                              {copiedId === item.id ? '✅ Copiado' : '🔗 Copiar Link'}
+                              {copiedId === item.id ? '✅ Link Copiado!' : '🔗 Copiar Link'}
                             </button>
                           )}
                         </label>
@@ -1229,7 +1234,7 @@ export default function LiturgyBuilderPage() {
                     <textarea
                       className="form-input"
                       style={{ fontSize: '0.85rem', backgroundColor: 'var(--background-secondary)', border: '1px dashed var(--border)', resize: 'vertical', minHeight: '40px' }}
-                      placeholder="Detalhes (ex: Título da Música / Observações)"
+                      placeholder={isMusical ? 'Detalhes (ex: Título da Música / Hino)' : 'Detalhes / Observações (opcional)'}
                       value={item.notes || ''}
                       onChange={(e) => handleUpdateItem(idx, 'notes', e.target.value)}
                       rows={1}
@@ -1258,10 +1263,10 @@ export default function LiturgyBuilderPage() {
 
           {items.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', gap: '12px', flexWrap: 'wrap' }}>
-              <button 
+              <button
                 type="button"
-                className="btn btn-outline" 
-                style={{ padding: '10px 16px', borderStyle: 'dashed', display: 'flex', alignItems: 'center', gap: '8px' }} 
+                className="btn btn-outline"
+                style={{ padding: '10px 16px', borderStyle: 'dashed', display: 'flex', alignItems: 'center', gap: '8px' }}
                 onClick={() => addItem(items.length - 1)}
               >
                 ➕ Adicionar Novo Item à Liturgia
@@ -1280,11 +1285,11 @@ export default function LiturgyBuilderPage() {
       </div>
 
       {isGeneratingImage && (
-        <div 
-          id="liturgia-print-view" 
-          style={{ 
-            position: 'absolute', top: 0, left: 0, width: isTwoColumns ? '920px' : '480px', 
-            background: 'white', padding: '30px', color: 'black', 
+        <div
+          id="liturgia-print-view"
+          style={{
+            position: 'absolute', top: 0, left: 0, width: isTwoColumns ? '920px' : '480px',
+            background: 'white', padding: '30px', color: 'black',
             zIndex: -100, fontFamily: 'sans-serif'
           }}
         >
@@ -1311,39 +1316,39 @@ export default function LiturgyBuilderPage() {
               </div>
             </div>
           </div>
-          
+
           {/* Items Container */}
           <div style={{ columnCount: isTwoColumns ? 2 : 1, columnGap: '16px' }}>
             {items.map((item, idx) => (
-               <div key={item.id || idx} style={{ display: 'flex', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '10px 16px', gap: '16px', breakInside: 'avoid', pageBreakInside: 'avoid', marginBottom: '8px' }}>
-                 
-                 <div style={{ fontWeight: 800, fontSize: '17px', width: '50px', color: '#4f46e5', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                   {formatTime(item.calculated_time)}
-                 </div>
-                 
-                 <div style={{ width: '2px', background: '#cbd5e1', borderRadius: '2px' }}></div>
-                 
-                 <div style={{ flex: 1 }}>
-                   <div style={{ fontWeight: 'bold', fontSize: '17px', color: '#0f172a' }}>{item.title}</div>
-                   
-                   {item.is_list && item.list_data && item.list_data.songs && (item.list_data.songs.some(s => s && s.trim()) || item.list_data.singers) ? (
-                     <div style={{ marginTop: '6px', background: '#ffffff', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                       <div style={{ fontSize: '13px', color: '#475569', fontWeight: 700, marginBottom: '2px' }}>🎤 {item.list_data.singers || 'Equipe'}:</div>
-                       <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#334155' }}>
-                         {item.list_data.songs.filter(s => s && s.trim()).map((song, i) => (
-                           <li key={i} style={{ marginBottom: '2px' }}>{song}</li>
-                         ))}
-                       </ul>
-                     </div>
-                   ) : (
-                     item.person_name && <div style={{ fontSize: '14px', color: '#475569', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>👤 <span style={{ fontWeight: 600 }}>{formatName(item.person_name)}</span></div>
-                   )}
-                   
-                   {item.notes && <div style={{ fontSize: '13px', color: '#64748b', marginTop: '6px', fontStyle: 'italic' }}>📌 {item.notes}</div>}
-                 </div>
-                 
-                 <div style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 700, alignSelf: 'flex-start', paddingTop: '4px' }}>{item.duration_minutes}m</div>
-               </div>
+              <div key={item.id || idx} style={{ display: 'flex', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '10px 16px', gap: '16px', breakInside: 'avoid', pageBreakInside: 'avoid', marginBottom: '8px' }}>
+
+                <div style={{ fontWeight: 800, fontSize: '17px', width: '50px', color: '#4f46e5', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                  {formatTime(item.calculated_time)}
+                </div>
+
+                <div style={{ width: '2px', background: '#cbd5e1', borderRadius: '2px' }}></div>
+
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '17px', color: '#0f172a' }}>{item.title}</div>
+
+                  {item.is_list && item.list_data && item.list_data.songs && (item.list_data.songs.some(s => s && s.trim()) || item.list_data.singers) ? (
+                    <div style={{ marginTop: '6px', background: '#ffffff', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '13px', color: '#475569', fontWeight: 700, marginBottom: '2px' }}>🎤 {item.list_data.singers || 'Equipe'}:</div>
+                      <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#334155' }}>
+                        {item.list_data.songs.filter(s => s && s.trim()).map((song, i) => (
+                          <li key={i} style={{ marginBottom: '2px' }}>{song}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    item.person_name && <div style={{ fontSize: '14px', color: '#475569', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>👤 <span style={{ fontWeight: 600 }}>{formatName(item.person_name)}</span></div>
+                  )}
+
+                  {item.notes && <div style={{ fontSize: '13px', color: '#64748b', marginTop: '6px', fontStyle: 'italic' }}>📌 {item.notes}</div>}
+                </div>
+
+                <div style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 700, alignSelf: 'flex-start', paddingTop: '4px' }}>{item.duration_minutes}m</div>
+              </div>
             ))}
           </div>
         </div>

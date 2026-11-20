@@ -75,22 +75,94 @@ export async function getLiturgyItemPublic(itemId: string) {
   const supabase = supabaseAdmin;
   const { data, error } = await supabase
     .from('liturgy_items')
-    .select('*, liturgy:liturgies(event_id, events(title, date))')
+    .select(`
+      *,
+      responsible_person:people(id, name),
+      liturgy:liturgies(
+        event_id,
+        events(
+          id,
+          title,
+          date,
+          start_time
+        )
+      )
+    `)
     .eq('id', itemId)
     .single();
 
   if (error) {
     console.error('getLiturgyItemPublic error:', error);
-    throw new Error('Item não encontrado ou erro de permissão.');
+    throw new Error('Item não encontrado ou link inválido.');
   }
-  return data;
+
+  // Also fetch list of active church members for the autocomplete
+  const { data: peopleData } = await supabase
+    .from('people')
+    .select('id, name')
+    .eq('is_active', true)
+    .order('name');
+
+  return {
+    item: data,
+    people: peopleData || []
+  };
 }
 
-export async function updateLiturgyItemPublic(itemId: string, updateData: any) {
+export async function updateLiturgyItemPublic(itemId: string, payload: {
+  responsible_person_id?: string | null;
+  custom_name?: string | null;
+  notes?: string | null;
+  singers?: string | null;
+  songs?: string[];
+}) {
   const supabase = supabaseAdmin;
+
+  let finalPersonId = payload.responsible_person_id || null;
+
+  // If a custom name was typed and no person ID selected:
+  if (!finalPersonId && payload.custom_name && payload.custom_name.trim()) {
+    const trimmed = payload.custom_name.trim();
+    // Check if person exists in people table
+    const { data: existing } = await supabase
+      .from('people')
+      .select('id')
+      .ilike('name', trimmed)
+      .maybeSingle();
+
+    if (existing) {
+      finalPersonId = existing.id;
+    } else {
+      // Create new person in people table
+      const { data: newPerson, error: pError } = await supabase
+        .from('people')
+        .insert({ name: trimmed, is_active: true })
+        .select('id')
+        .single();
+      if (!pError && newPerson) {
+        finalPersonId = newPerson.id;
+      }
+    }
+  }
+
+  // If musical list with singers/songs
+  let finalNotes = payload.notes || null;
+  if ((payload.singers && payload.singers.trim()) || (payload.songs && payload.songs.some(s => s && s.trim()))) {
+    const validSongs = (payload.songs || []).filter(s => s && s.trim());
+    finalNotes = JSON.stringify({
+      singers: (payload.singers || '').trim(),
+      songs: validSongs
+    });
+  }
+
+  const updateFields: any = {
+    responsible_person_id: finalPersonId,
+    notes: finalNotes
+  };
+
   const { error } = await supabase
     .from('liturgy_items')
-    .update(updateData)
+    .update(updateFields)
     .eq('id', itemId);
 
   if (error) {
