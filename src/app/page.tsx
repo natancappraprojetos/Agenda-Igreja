@@ -87,6 +87,29 @@ export default function AgendaPage() {
     try {
       const { error } = await supabase.from('events').update({ [field]: value }).eq('id', eventId);
       if (error) throw error;
+
+      // Sincronizar com event_participants para manter as escalas em harmonia
+      if (['worship_leader_id', 'sound_person_id', 'preacher_id'].includes(field)) {
+        const roleMap: Record<string, string> = {
+          worship_leader_id: 'Líder de Louvor',
+          sound_person_id: 'Sonoplasta',
+          preacher_id: 'Pregador'
+        };
+        const targetRoleName = roleMap[field];
+        const roleObj = availableRoles.find(r => r.name.toLowerCase().includes(targetRoleName.toLowerCase()));
+        if (roleObj) {
+          if (!value) {
+            await supabase.from('event_participants').delete().eq('event_id', eventId).eq('role_id', roleObj.id);
+          } else {
+            const { data: existing } = await supabase.from('event_participants').select('id').eq('event_id', eventId).eq('role_id', roleObj.id).maybeSingle();
+            if (existing) {
+              await supabase.from('event_participants').update({ person_id: value }).eq('id', existing.id);
+            } else {
+              await supabase.from('event_participants').insert({ event_id: eventId, role_id: roleObj.id, person_id: value });
+            }
+          }
+        }
+      }
       
       const { data } = await supabase
         .from('events')
@@ -106,6 +129,7 @@ export default function AgendaPage() {
       if (data) {
         setSelectedEvent(data as ChurchEvent);
         setEvents(prev => prev.map(e => e.id === eventId ? (data as ChurchEvent) : e));
+        fetchExtraParticipants(eventId);
         addToast({ type: 'success', title: 'Salvo com sucesso' });
       }
     } catch (err) {
@@ -976,10 +1000,11 @@ export default function AgendaPage() {
                 {(() => {
                   
                   const isSabado = selectedEvent.title.toLowerCase().includes('sáb') || selectedEvent.title.toLowerCase().includes('sabado');
-                  const baseVirtualRoles = isSabado ? ['Escola Sabatina', 'História das Crianças', 'Ofertas', 'Anúncios'] : [];
+                  const isCulto = selectedEvent.event_type?.name?.toLowerCase().includes('culto');
+                  const baseVirtualRoles = isCulto ? ['Cantor(a) Solo', ...(isSabado ? ['Escola Sabatina', 'História das Crianças', 'Ofertas', 'Anúncios'] : [])] : (isSabado ? ['Escola Sabatina', 'História das Crianças', 'Ofertas', 'Anúncios'] : []);
                   
                   const displayedRoles: any[] = [];
-                  const standardRoles = ['Pregador', 'Pregador(a)', 'Ancião', 'Diácono', 'Diaconisa', 'Diácono/Diaconisa', 'Sonoplasta', 'Cantor', 'Líder de Louvor', 'Instrumentista', 'Pianista', 'Violonista', 'Cantor(a) Solo', 'Cantor(a) Congregacional', 'Responsável', 'Diretor'];
+                  const standardRoles = ['Pregador', 'Pregador(a)', 'Ancião', 'Diácono', 'Diaconisa', 'Diácono/Diaconisa', 'Sonoplasta', 'Cantor', 'Líder de Louvor', 'Instrumentista', 'Pianista', 'Violonista', 'Cantor(a) Congregacional', 'Responsável', 'Diretor'];
 
                   baseVirtualRoles.forEach(vr => {
                      const ep = eventParticipants.find(p => p.role?.name === vr);
@@ -1005,7 +1030,7 @@ export default function AgendaPage() {
                       <div className="review-grid" style={{ marginTop: 'var(--space-2)' }}>
                         {populatedRoles.map((dr, idx) => (
                           <div key={idx} className="review-section">
-                            <div className="review-label">✨ {dr.roleName}</div>
+                            <div className="review-label">✨ {dr.roleName === 'Cantor(a) Solo' ? '🎤 Mensagem Musical' : dr.roleName}</div>
                             <div className="review-value">
                               <span style={{ fontWeight: 500 }}>{dr.personName}</span>
                             </div>
@@ -1021,7 +1046,7 @@ export default function AgendaPage() {
                         <div className="review-grid" style={{ marginTop: 'var(--space-2)' }}>
                           {displayedRoles.map((dr, idx) => (
                             <div key={idx} className="review-section" style={{ overflow: 'visible' }}>
-                              <div className="review-label">✨ {dr.roleName}</div>
+                              <div className="review-label">✨ {dr.roleName === 'Cantor(a) Solo' ? '🎤 Mensagem Musical / Solo' : dr.roleName}</div>
                               <div className="review-value">
                                 {dr.roleId ? (
                                   <PersonSelect 

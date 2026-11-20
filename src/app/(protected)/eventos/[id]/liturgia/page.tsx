@@ -180,10 +180,20 @@ export default function LiturgyBuilderPage() {
             let pId = i.responsible_person_id;
             let pName = i.person?.name;
             const t = (i.title || '').toLowerCase();
+            const solo = findPerson(['Solo', 'Cantor', 'Cantor(a) Solo']);
 
             if (t.includes('sermão') || t.includes('pregação') || t.includes('oração final')) {
               if (!pId && evData.preacher_id) { pId = evData.preacher_id; pName = evData.preacher?.name; }
-            } else if (t.includes('louvor especial') || t.includes('louvor inicial') || t.includes('louvor final') || t === 'louvor') {
+            } else if (t.includes('mensagem musical') || t.includes('música especial') || t.includes('louvor especial (solo)')) {
+              if (!pId && solo) { pId = solo.id; pName = solo.name; }
+            } else if (t.includes('louvor final')) {
+              if (!pId) {
+                if (solo) { pId = solo.id; pName = solo.name; }
+                else if (evData.worship_leader_id) { pId = evData.worship_leader_id; pName = evData.worship_leader?.name; }
+              }
+            } else if (t.includes('louvores congregacionais') || t.includes('momento de louvor') || isCongregationalPraise(t)) {
+              if (!pId && evData.worship_leader_id) { pId = evData.worship_leader_id; pName = evData.worship_leader?.name; }
+            } else if (t.includes('louvor inicial') || t === 'louvor') {
               if (!pId && evData.worship_leader_id) { pId = evData.worship_leader_id; pName = evData.worship_leader?.name; }
             } else if (t.includes('oferta') || t.includes('fidelidade')) {
               const p = findPerson(['Oferta']);
@@ -234,9 +244,16 @@ export default function LiturgyBuilderPage() {
                if (leaderName) parts.push(`Responsável: ${leaderName}`);
                if (teamNames) parts.push(`Equipe: ${teamNames}`);
                listData.singers = parts.join(' | ');
-            } else if ((t.includes('louvor especial') || t.includes('música especial') || t.includes('solo')) && (!pId || pId === evData.worship_leader_id)) {
-               const solo = findPerson(['Solo', 'Cantor']);
+            } else if ((t.includes('louvor especial') || t.includes('música especial') || t.includes('mensagem musical') || t.includes('solo')) && (!pId || pId === evData.worship_leader_id)) {
                if (solo) {
+                  pId = solo.id;
+                  pName = solo.name;
+               } else if (pId === evData.worship_leader_id) {
+                  pId = null;
+                  pName = null;
+               }
+            } else if (t.includes('louvor final')) {
+               if (solo && (!pId || pId === evData.worship_leader_id)) {
                   pId = solo.id;
                   pName = solo.name;
                }
@@ -312,9 +329,9 @@ export default function LiturgyBuilderPage() {
         { emoji: '🙏', title: 'Oração Inicial', duration: 5, person: null },
         { emoji: '🎁', title: 'Sorteio', duration: 5, person: null },
         { emoji: '🎼', title: 'Louvor Inicial', duration: 4, person: ev.worship_leader },
-        { emoji: '🎤', title: 'Música Especial', duration: 5, person: findPerson(['Solo', 'Cantor']) },
+        { emoji: '🎤', title: 'Música Especial', duration: 5, person: findPerson(['Solo', 'Cantor', 'Cantor(a) Solo']) },
         { emoji: '📖', title: 'Pregação', duration: 30, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
-        { emoji: '🎤', title: 'Música Especial (Apelo)', duration: 5, person: findPerson(['Solo', 'Cantor']) },
+        { emoji: '🎤', title: 'Música Especial (Apelo)', duration: 5, person: findPerson(['Solo', 'Cantor', 'Cantor(a) Solo']) },
         { emoji: '🙏', title: 'Oração Final', duration: 3, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
         { emoji: '🤝', title: 'Confraternização / Lanche', duration: 5, person: null },
       ];
@@ -331,10 +348,10 @@ export default function LiturgyBuilderPage() {
         { emoji: '💰', title: 'Momento de Fidelidade (Dízimos e Ofertas)', duration: 10, person: findPerson(['Oferta']) },
         { emoji: '🎼', title: 'Louvores Congregacionais', duration: 10, person: ev.worship_leader, is_list: true },
         { emoji: '🙏', title: 'Oração Inicial (de joelhos)', duration: 5, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
-        { emoji: '🎤', title: 'Louvor Especial (Solo)', duration: 5, person: findPerson(['Solo', 'Cantor']) },
+        { emoji: '🎤', title: 'Louvor Especial (Solo)', duration: 5, person: findPerson(['Solo', 'Cantor', 'Cantor(a) Solo']) },
         { emoji: '📖', title: 'Sermão da Santa Ceia', duration: 30, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
         { emoji: '🍞', title: 'Cerimônia de Lava-Pés e Santa Ceia', duration: 25, person: ev.responsible_person },
-        { emoji: '🎼', title: 'Louvor Final', duration: 5, person: findPerson(['Solo', 'Cantor']) || ev.worship_leader },
+        { emoji: '🎼', title: 'Louvor Final', duration: 5, person: findPerson(['Solo', 'Cantor', 'Cantor(a) Solo']) || ev.worship_leader },
         { emoji: '🙏', title: 'Oração Final', duration: 3, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
       ];
     } else if (isSabado) {
@@ -345,16 +362,16 @@ export default function LiturgyBuilderPage() {
         { emoji: '🌍', title: 'Informativo Mundial das Missões', duration: 7, person: null },
         { emoji: '📘', title: 'Estudo da Lição nas Classes', duration: 30, person: { name: 'Professores' } },
         { emoji: '💼', title: 'Pastoreio nas Classes', duration: 10, person: { name: 'Professores' } },
-        { emoji: '🎼', title: 'Louvor Especial', duration: 5, person: findPerson(['Solo', 'Cantor']) || ev.worship_leader },
+        { emoji: '🎼', title: 'Louvor Especial', duration: 5, person: null },
         { emoji: '📣', title: 'Anúncios', duration: 5, person: findPerson(['Anúncios', 'Responsável']) || ev.responsible_person },
         { emoji: '👨‍👩‍👧‍👦', title: 'Momento da Família', duration: 5, person: null },
         { emoji: '🧸', title: 'História das crianças', duration: 5, person: findPerson(['História', 'Criança']) },
         { emoji: '💰', title: 'Provai e Vede + Ofertas', duration: 10, person: findPerson(['Oferta']) },
         { emoji: '🎼', title: 'Louvores Congregacionais', duration: 10, person: ev.worship_leader, is_list: true },
-        { emoji: '🎤', title: 'Mensagem Musical', duration: 5, person: findPerson(['Solo', 'Cantor']) || ev.worship_leader },
+        { emoji: '🎤', title: 'Mensagem Musical', duration: 5, person: findPerson(['Solo', 'Cantor', 'Cantor(a) Solo']) },
         { emoji: '🙏', title: 'Oração Inicial (de joelhos)', duration: 5, person: null },
         { emoji: '📖', title: 'Sermão', duration: 35, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
-        { emoji: '🎼', title: 'Louvor Final', duration: 5, person: findPerson(['Solo', 'Cantor']) || ev.worship_leader },
+        { emoji: '🎼', title: 'Louvor Final', duration: 5, person: findPerson(['Solo', 'Cantor', 'Cantor(a) Solo']) || ev.worship_leader },
         { emoji: '🙏', title: 'Oração Final', duration: 3, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
       ];
     } else if (isQuarta) {
@@ -365,7 +382,7 @@ export default function LiturgyBuilderPage() {
         { emoji: '💰', title: 'Momento Fidelidade / Ofertas', duration: 5, person: findPerson(['Oferta']) },
         { emoji: '🎼', title: 'Louvor Inicial', duration: 4, person: ev.worship_leader },
         { emoji: '📖', title: 'Pregação', duration: 30, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
-        { emoji: '🎼', title: 'Louvor Final', duration: 3, person: ev.worship_leader },
+        { emoji: '🎼', title: 'Louvor Final', duration: 3, person: findPerson(['Solo', 'Cantor', 'Cantor(a) Solo']) || ev.worship_leader },
         { emoji: '🙏', title: 'Oração Final', duration: 3, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
       ];
     } else {
@@ -376,9 +393,9 @@ export default function LiturgyBuilderPage() {
         { emoji: '🙏', title: 'Oração Inicial', duration: 5, person: null },
         { emoji: '💰', title: 'Momento Fidelidade / Ofertas', duration: 5, person: findPerson(['Oferta']) },
         { emoji: '🎼', title: 'Louvor Inicial', duration: 4, person: ev.worship_leader },
-        { emoji: '🎤', title: 'Música Especial', duration: 5, person: findPerson(['Solo', 'Cantor']) },
+        { emoji: '🎤', title: 'Música Especial', duration: 5, person: findPerson(['Solo', 'Cantor', 'Cantor(a) Solo']) },
         { emoji: '📖', title: 'Pregação', duration: 30, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
-        { emoji: '🎼', title: 'Louvor Final', duration: 4, person: ev.worship_leader },
+        { emoji: '🎼', title: 'Louvor Final', duration: 4, person: findPerson(['Solo', 'Cantor', 'Cantor(a) Solo']) || ev.worship_leader },
         { emoji: '🙏', title: 'Oração Final', duration: 3, person: findPerson(['Pregador', 'Sermão', 'Pregação']) || ev.preacher },
       ];
     }

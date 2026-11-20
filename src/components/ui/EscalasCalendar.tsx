@@ -259,6 +259,13 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
           await supabase.from('event_participants').delete().eq('id', existing.id);
           addToast({ type: 'success', title: 'Escala removida' });
         }
+        if (managedRole === 'Líder de Louvor') {
+          await supabase.from('events').update({ worship_leader_id: null }).eq('id', eventId);
+        } else if (managedRole === 'Sonoplasta') {
+          await supabase.from('events').update({ sound_person_id: null }).eq('id', eventId);
+        } else if (managedRole === 'Pregador(a)' || managedRole === 'Pregador') {
+          await supabase.from('events').update({ preacher_id: null }).eq('id', eventId);
+        }
       } else {
         if (existing) {
           await supabase.from('event_participants').update({ person_id: personId }).eq('id', existing.id);
@@ -268,6 +275,13 @@ export default function EscalasCalendar({ title, icon, eventTypesToInclude, role
             role_id: roleId || aliasIds[0],
             person_id: personId
           });
+        }
+        if (managedRole === 'Líder de Louvor') {
+          await supabase.from('events').update({ worship_leader_id: personId }).eq('id', eventId);
+        } else if (managedRole === 'Sonoplasta') {
+          await supabase.from('events').update({ sound_person_id: personId }).eq('id', eventId);
+        } else if (managedRole === 'Pregador(a)' || managedRole === 'Pregador') {
+          await supabase.from('events').update({ preacher_id: personId }).eq('id', eventId);
         }
         addToast({ type: 'success', title: 'Escala salva com sucesso!' });
       }
