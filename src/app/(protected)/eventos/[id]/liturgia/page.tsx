@@ -99,6 +99,31 @@ function isCongregationalPraise(title: string): boolean {
   return t.includes('congregaciona') || t.includes('momento de louvor') || t.includes('cânticos') || t.includes('canticos');
 }
 
+export const isNoOne = (item: LocalLiturgyItem) => {
+  const pName = (item.person_name || '').trim().toLowerCase();
+  const notes = (item.notes || '').trim().toLowerCase();
+  const singers = (item.list_data?.singers || '').trim().toLowerCase();
+  return pName === 'não haverá' || 
+         pName === 'sem responsável' || 
+         pName === 'ninguém' || 
+         pName === 'dispensado' || 
+         notes === 'sem_responsavel' ||
+         singers === 'não haverá' ||
+         singers === 'sem responsável' ||
+         singers === 'ninguém' ||
+         singers === 'dispensado';
+};
+
+export const isItemPending = (item: LocalLiturgyItem) => {
+  if (isNoOne(item)) return false;
+  
+  if (item.is_list) {
+    return !item.list_data?.singers?.trim();
+  }
+  
+  return !item.person_id && !item.person_name?.trim();
+};
+
 export default function LiturgyBuilderPage() {
   const params = useParams();
   const eventId = params.id as string;
@@ -719,6 +744,26 @@ export default function LiturgyBuilderPage() {
     setItems(calculated);
   };
 
+  const handleSetNoOne = (index: number, noOne: boolean) => {
+    const newItems = [...items];
+    const item = newItems[index];
+    if (item.is_list) {
+      const data = item.list_data || { singers: '', songs: [] };
+      newItems[index] = {
+        ...item,
+        list_data: { ...data, singers: noOne ? 'Não haverá' : '' }
+      };
+    } else {
+      newItems[index] = {
+        ...item,
+        person_id: null,
+        person_name: noOne ? 'Não haverá' : ''
+      };
+    }
+    const calculated = calculateLiturgyTimes(newItems, event.start_time) as LocalLiturgyItem[];
+    setItems(calculated);
+  };
+
   const handleSave = async () => {
     if (!liturgyId) return;
     setSaving(true);
@@ -820,6 +865,7 @@ export default function LiturgyBuilderPage() {
 
 
   const isTwoColumns = items.length > 10;
+  const pendingCount = items.filter(isItemPending).length;
 
   return (
     <>
@@ -841,9 +887,24 @@ export default function LiturgyBuilderPage() {
       </Header>
 
       <div className="app-content" style={{ maxWidth: '1050px', margin: '0 auto', width: '100%', paddingBottom: '100px' }}>
-        <div className="card mb-4" style={{ backgroundColor: 'var(--primary)', color: 'white' }}>
-          <h2 style={{ fontSize: '1.2rem', margin: '0 0 var(--space-2) 0' }}>{event.title}</h2>
-          <p style={{ margin: 0, opacity: 0.9 }}>{formatDateShort(event.date)} • {formatTime(event.start_time)}</p>
+        <div className="card mb-4" style={{ backgroundColor: 'var(--primary)', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h2 style={{ fontSize: '1.25rem', margin: '0 0 var(--space-1) 0', fontWeight: 700 }}>{event.title}</h2>
+            <p style={{ margin: 0, opacity: 0.9 }}>{formatDateShort(event.date)} • {formatTime(event.start_time)}</p>
+          </div>
+          <div>
+            {pendingCount > 0 ? (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '20px', backgroundColor: '#fee2e2', color: '#991b1b', fontWeight: 700, fontSize: '0.85rem', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
+                <span>⚠️</span>
+                <span>{pendingCount} {pendingCount === 1 ? 'item pendente' : 'itens pendentes'}</span>
+              </div>
+            ) : items.length > 0 ? (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '20px', backgroundColor: '#dcfce7', color: '#166534', fontWeight: 700, fontSize: '0.85rem', boxShadow: '0 2px 6px rgba(0,0,0,0.15)' }}>
+                <span>✅</span>
+                <span>Liturgia 100% Definida</span>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {/* Seletor Rápido de Modelos */}
@@ -901,187 +962,293 @@ export default function LiturgyBuilderPage() {
         </div>
 
         <div className="liturgy-builder" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          {items.map((item, idx) => (
-            <div key={idx} className="card" style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start', padding: 'var(--space-3)' }}>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                <button 
-                  className="btn btn-ghost" 
-                  style={{ padding: '4px', height: 'auto', minHeight: 'auto', opacity: idx === 0 ? 0.3 : 1 }}
-                  onClick={() => moveItem(idx, 'up')}
-                  disabled={idx === 0}
-                >
-                  ⬆️
-                </button>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>{idx + 1}</div>
-                <button 
-                  className="btn btn-ghost" 
-                  style={{ padding: '4px', height: 'auto', minHeight: 'auto', opacity: idx === items.length - 1 ? 0.3 : 1 }}
-                  onClick={() => moveItem(idx, 'down')}
-                  disabled={idx === items.length - 1}
-                >
-                  ⬇️
-                </button>
-              </div>
+          {items.map((item, idx) => {
+            const isPending = isItemPending(item);
+            const isNone = isNoOne(item);
 
-              <div style={{ width: '60px', fontWeight: 600, color: 'var(--primary)', paddingTop: '8px', fontSize: '1.1rem' }}>
-                {formatTime(item.calculated_time)}
-              </div>
-
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    value={item.title} 
-                    onChange={(e) => handleUpdateItem(idx, 'title', e.target.value)}
-                    placeholder="Título do Item"
-                    style={{ fontWeight: 600, flex: 1, minWidth: 0 }}
-                  />
-                  
-                  <div style={{ width: '90px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <input 
-                      type="number" 
-                      className="form-input" 
-                      value={item.duration_minutes || ''} 
-                      onChange={(e) => handleUpdateItem(idx, 'duration_minutes', parseInt(e.target.value) || 0)}
-                      min="1"
-                      style={{ paddingRight: '4px', textAlign: 'center' }}
-                    />
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>min</span>
-                  </div>
-                </div>
-
-                {/* Alternador de Modo: Individual vs Lista de Hinos */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '2px 0' }}>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    {item.is_list ? '🎤 Modo: Equipe de Louvor (Lista de Hinos)' : '👤 Modo: Pessoa / Cantor Individual'}
-                  </span>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    style={{ fontSize: '0.72rem', padding: '2px 6px', color: 'var(--primary)', height: 'auto', minHeight: 'auto' }}
-                    onClick={() => handleToggleListMode(idx)}
-                    title="Alternar entre modo Cantor Individual ou Lista de Hinos"
+            return (
+              <div 
+                key={idx} 
+                className="card" 
+                style={{ 
+                  display: 'flex', 
+                  gap: 'var(--space-3)', 
+                  alignItems: 'flex-start', 
+                  padding: 'var(--space-3)',
+                  borderRadius: 'var(--radius-lg, 12px)',
+                  transition: 'all 0.2s ease',
+                  ...(isPending ? {
+                    border: '2px solid var(--danger, #ef4444)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.04)',
+                    boxShadow: '0 0 10px rgba(239, 68, 68, 0.12)',
+                  } : isNone ? {
+                    border: '1px dashed #cbd5e1',
+                    backgroundColor: '#f8fafc',
+                    opacity: 0.88,
+                  } : {
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'var(--surface)',
+                  })
+                }}
+              >
+                
+                {/* Reordenar */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                  <button 
+                    className="btn btn-ghost" 
+                    style={{ padding: '4px', height: 'auto', minHeight: 'auto', opacity: idx === 0 ? 0.3 : 1 }}
+                    onClick={() => moveItem(idx, 'up')}
+                    disabled={idx === 0}
                   >
-                    {item.is_list ? '👤 Mudar para Cantor Individual' : '🎤 Mudar para Lista de Hinos'}
+                    ⬆️
+                  </button>
+                  <div style={{ fontSize: '0.8rem', color: isPending ? 'var(--danger-dark, #b91c1c)' : 'var(--text-tertiary)', fontWeight: 700 }}>{idx + 1}</div>
+                  <button 
+                    className="btn btn-ghost" 
+                    style={{ padding: '4px', height: 'auto', minHeight: 'auto', opacity: idx === items.length - 1 ? 0.3 : 1 }}
+                    onClick={() => moveItem(idx, 'down')}
+                    disabled={idx === items.length - 1}
+                  >
+                    ⬇️
                   </button>
                 </div>
 
-                {!item.is_list && (
-                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>Responsável (Opcional)</span>
-                        {!item.person_id && item.id && (
+                {/* Horário */}
+                <div style={{ width: '60px', fontWeight: 700, color: isPending ? 'var(--danger, #ef4444)' : 'var(--primary)', paddingTop: '8px', fontSize: '1.1rem' }}>
+                  {formatTime(item.calculated_time)}
+                </div>
+
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  {/* Linha de Título, Duração e Status */}
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      value={item.title} 
+                      onChange={(e) => handleUpdateItem(idx, 'title', e.target.value)}
+                      placeholder="Título do Item"
+                      style={{ 
+                        fontWeight: 600, 
+                        flex: 1, 
+                        minWidth: '180px',
+                        ...(isPending ? { borderColor: 'var(--danger-light, #fca5a5)' } : {})
+                      }}
+                    />
+                    
+                    <div style={{ width: '85px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <input 
+                        type="number" 
+                        className="form-input" 
+                        value={item.duration_minutes || ''} 
+                        onChange={(e) => handleUpdateItem(idx, 'duration_minutes', parseInt(e.target.value) || 0)}
+                        min="1"
+                        style={{ paddingRight: '4px', textAlign: 'center' }}
+                      />
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>min</span>
+                    </div>
+
+                    {/* Badge e Ação de Pendente / Não haverá */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                      {isPending ? (
+                        <>
+                          <span style={{ 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            gap: '4px', 
+                            padding: '3px 8px', 
+                            borderRadius: '6px', 
+                            fontSize: '0.75rem', 
+                            fontWeight: 700, 
+                            backgroundColor: '#fee2e2', 
+                            color: '#b91c1c', 
+                            border: '1px solid #f87171' 
+                          }}>
+                            ⚠️ Pendente
+                          </span>
                           <button
-                            className="btn btn-success btn-sm"
-                            style={{ padding: '2px 8px', fontSize: '0.75rem' }}
-                            title="Copiar Link de Preenchimento para enviar"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              const link = `${window.location.origin}/convite/liturgia/${item.id}`;
-                              await navigator.clipboard.writeText(link);
-                              setCopiedId(item.id || null);
-                              addToast({ type: 'success', title: 'Link copiado!' });
-                              setTimeout(() => setCopiedId(null), 3000);
-                            }}
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            style={{ fontSize: '0.72rem', padding: '3px 8px', color: '#64748b', borderColor: '#cbd5e1', height: 'auto', minHeight: 'auto', whiteSpace: 'nowrap' }}
+                            onClick={() => handleSetNoOne(idx, true)}
+                            title="Definir que ninguém fará este item (tirar o vermelho)"
                           >
-                            {copiedId === item.id ? '✅ Copiado' : '🔗 Copiar Link'}
+                            🚫 Não haverá
                           </button>
-                        )}
-                      </label>
-                      <div className="liturgy-item-person">
-                        <PersonSelect 
-                          value={item.person_id || ''} 
-                          onChange={(val, person) => handleUpdateItem(idx, 'person_id', val, person?.name || '')}
-                          placeholder="Buscar pessoa..."
-                        />
-                      </div>
+                        </>
+                      ) : isNone ? (
+                        <>
+                          <span style={{ 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            gap: '4px', 
+                            padding: '3px 8px', 
+                            borderRadius: '6px', 
+                            fontSize: '0.75rem', 
+                            fontWeight: 600, 
+                            backgroundColor: '#f1f5f9', 
+                            color: '#475569', 
+                            border: '1px dashed #cbd5e1' 
+                          }}>
+                            ⚪ Não haverá
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            style={{ fontSize: '0.72rem', padding: '3px 8px', color: 'var(--primary)', height: 'auto', minHeight: 'auto', whiteSpace: 'nowrap' }}
+                            onClick={() => handleSetNoOne(idx, false)}
+                            title="Desfazer e escolher um responsável"
+                          >
+                            ↩️ Desfazer
+                          </button>
+                        </>
+                      ) : null}
                     </div>
                   </div>
-                )}
-                
-                {item.is_list ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
 
-                    
-                    <div style={{ marginBottom: '8px' }}>
-                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>Cantores (Equipe que vai puxar os hinos)</span>
-                        {item.id && (
-                          <button
-                            className="btn btn-success btn-sm"
-                            style={{ padding: '2px 8px', fontSize: '0.75rem' }}
-                            title="Copiar Link de Preenchimento para enviar à equipe"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              const link = `${window.location.origin}/convite/liturgia/${item.id}`;
-                              await navigator.clipboard.writeText(link);
-                              setCopiedId(item.id || null);
-                              addToast({ type: 'success', title: 'Link copiado!' });
-                              setTimeout(() => setCopiedId(null), 3000);
-                            }}
-                          >
-                            {copiedId === item.id ? '✅ Copiado' : '🔗 Copiar Link'}
-                          </button>
-                        )}
-                      </label>
-                      <input 
-                        type="text" 
-                        className="form-input form-input-sm" 
-                        placeholder="Ex: Natan, Maria e João" 
-                        value={item.list_data?.singers || ''} 
-                        onChange={e => handleUpdateListSingers(idx, e.target.value)}
-                        style={{ fontSize: '0.9rem', fontWeight: 500 }}
-                      />
-                    </div>
-
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
-                      Hinos (normalmente 2 hinos):
-                    </label>
-                    {(item.list_data?.songs || []).map((song, sIdx) => (
-                      <div key={sIdx} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                        <div style={{ flex: 1 }}>
-                          <input 
-                            type="text" 
-                            className="form-input form-input-sm" 
-                            placeholder={`Hino ${sIdx + 1} (ex: Vem Espírito Santo - 585 NHA)`} 
-                            value={song} 
-                            onChange={e => handleUpdateListSong(idx, sIdx, e.target.value)}
-                            style={{ fontSize: '0.85rem' }}
-                          />
-                        </div>
-                        <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px', color: 'var(--text-danger)' }} onClick={() => handleRemoveListSong(idx, sIdx)} title="Remover este hino">✖</button>
-                      </div>
-                    ))}
-                    <button type="button" className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start', fontSize: '0.8rem', color: 'var(--primary)' }} onClick={() => handleAddListSong(idx)}>
-                      + Adicionar Hino
+                  {/* Alternador de Modo: Individual vs Lista de Hinos */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '2px 0' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      {item.is_list ? '🎤 Modo: Equipe de Louvor (Lista de Hinos)' : '👤 Modo: Pessoa / Cantor Individual'}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: '0.72rem', padding: '2px 6px', color: 'var(--primary)', height: 'auto', minHeight: 'auto' }}
+                      onClick={() => handleToggleListMode(idx)}
+                      title="Alternar entre modo Cantor Individual ou Lista de Hinos"
+                    >
+                      {item.is_list ? '👤 Mudar para Cantor Individual' : '🎤 Mudar para Lista de Hinos'}
                     </button>
                   </div>
-                ) : (
-                  <textarea
-                    className="form-input"
-                    style={{ fontSize: '0.85rem', backgroundColor: 'var(--background-secondary)', border: '1px dashed var(--border)', resize: 'vertical', minHeight: '40px' }}
-                    placeholder="Detalhes (ex: Título da Música)"
-                    value={item.notes || ''}
-                    onChange={(e) => handleUpdateItem(idx, 'notes', e.target.value)}
-                    rows={1}
-                  />
-                )}
-              </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <button className="btn btn-ghost" style={{ padding: '8px', color: 'var(--text-danger)' }} onClick={() => removeItem(idx)} title="Remover">
-                  🗑️
-                </button>
-                <button className="btn btn-ghost" style={{ padding: '8px', color: 'var(--primary)' }} onClick={() => addItem(idx)} title="Adicionar abaixo">
-                  ➕
-                </button>
-              </div>
+                  {!item.is_list && (
+                    <div style={{ display: 'flex', gap: 'var(--space-2)', flexDirection: 'column' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: isPending ? 'var(--danger-dark, #b91c1c)' : 'var(--text-secondary)', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>{isPending ? '⚠️ Escolha o Responsável:' : 'Responsável (Opcional)'}</span>
+                          {!item.person_id && item.id && (
+                            <button
+                              className="btn btn-success btn-sm"
+                              style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                              title="Copiar Link de Preenchimento para enviar"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const link = `${window.location.origin}/convite/liturgia/${item.id}`;
+                                await navigator.clipboard.writeText(link);
+                                setCopiedId(item.id || null);
+                                addToast({ type: 'success', title: 'Link copiado!' });
+                                setTimeout(() => setCopiedId(null), 3000);
+                              }}
+                            >
+                              {copiedId === item.id ? '✅ Copiado' : '🔗 Copiar Link'}
+                            </button>
+                          )}
+                        </label>
+                        <div className="liturgy-item-person">
+                          <PersonSelect 
+                            value={item.person_id || ''} 
+                            onChange={(val, person) => handleUpdateItem(idx, 'person_id', val, person?.name || '')}
+                            placeholder={item.person_name ? item.person_name : (isNone ? 'Não haverá responsável' : 'Buscar pessoa...')}
+                          />
+                        </div>
+                        {!item.person_id && item.person_name && !isNone && (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px', background: 'var(--bg-secondary, #f8fafc)', padding: '3px 8px', borderRadius: '4px' }}>
+                            <span>Definido como: <strong style={{ color: 'var(--text)' }}>{item.person_name}</strong></span>
+                            <button 
+                              type="button" 
+                              className="btn btn-ghost btn-sm" 
+                              style={{ fontSize: '0.72rem', padding: '1px 6px', color: 'var(--text-danger)', height: 'auto', minHeight: 'auto' }}
+                              onClick={() => handleUpdateItem(idx, 'person_name', '')}
+                              title="Limpar e buscar uma pessoa da igreja"
+                            >
+                              ✖ Limpar
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {item.is_list ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)', border: isPending ? '1px solid var(--danger-light, #fca5a5)' : '1px solid var(--border)' }}>
 
-            </div>
-          ))}
+                      <div style={{ marginBottom: '8px' }}>
+                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: isPending ? 'var(--danger-dark, #b91c1c)' : 'var(--text-secondary)', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>{isPending ? '⚠️ Cantores (Pendente):' : 'Cantores (Equipe que vai puxar os hinos)'}</span>
+                          {item.id && (
+                            <button
+                              className="btn btn-success btn-sm"
+                              style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                              title="Copiar Link de Preenchimento para enviar à equipe"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const link = `${window.location.origin}/convite/liturgia/${item.id}`;
+                                await navigator.clipboard.writeText(link);
+                                setCopiedId(item.id || null);
+                                addToast({ type: 'success', title: 'Link copiado!' });
+                                setTimeout(() => setCopiedId(null), 3000);
+                              }}
+                            >
+                              {copiedId === item.id ? '✅ Copiado' : '🔗 Copiar Link'}
+                            </button>
+                          )}
+                        </label>
+                        <input 
+                          type="text" 
+                          className="form-input form-input-sm" 
+                          placeholder="Ex: Natan, Maria e João" 
+                          value={item.list_data?.singers || ''} 
+                          onChange={e => handleUpdateListSingers(idx, e.target.value)}
+                          style={{ fontSize: '0.9rem', fontWeight: 500 }}
+                        />
+                      </div>
+
+                      <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
+                        Hinos (normalmente 2 hinos):
+                      </label>
+                      {(item.list_data?.songs || []).map((song, sIdx) => (
+                        <div key={sIdx} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                          <div style={{ flex: 1 }}>
+                            <input 
+                              type="text" 
+                              className="form-input form-input-sm" 
+                              placeholder={`Hino ${sIdx + 1} (ex: Vem Espírito Santo - 585 NHA)`} 
+                              value={song} 
+                              onChange={e => handleUpdateListSong(idx, sIdx, e.target.value)}
+                              style={{ fontSize: '0.85rem' }}
+                            />
+                          </div>
+                          <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px', color: 'var(--text-danger)' }} onClick={() => handleRemoveListSong(idx, sIdx)} title="Remover este hino">✖</button>
+                        </div>
+                      ))}
+                      <button type="button" className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start', fontSize: '0.8rem', color: 'var(--primary)' }} onClick={() => handleAddListSong(idx)}>
+                        + Adicionar Hino
+                      </button>
+                    </div>
+                  ) : (
+                    <textarea
+                      className="form-input"
+                      style={{ fontSize: '0.85rem', backgroundColor: 'var(--background-secondary)', border: '1px dashed var(--border)', resize: 'vertical', minHeight: '40px' }}
+                      placeholder="Detalhes (ex: Título da Música / Observações)"
+                      value={item.notes || ''}
+                      onChange={(e) => handleUpdateItem(idx, 'notes', e.target.value)}
+                      rows={1}
+                    />
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <button className="btn btn-ghost" style={{ padding: '8px', color: 'var(--text-danger)' }} onClick={() => removeItem(idx)} title="Remover item da liturgia">
+                    🗑️
+                  </button>
+                  <button className="btn btn-ghost" style={{ padding: '8px', color: 'var(--primary)' }} onClick={() => addItem(idx)} title="Adicionar abaixo">
+                    ➕
+                  </button>
+                </div>
+
+              </div>
+            );
+          })}
 
           {items.length === 0 && (
             <button className="btn btn-outline" style={{ padding: 'var(--space-4)' }} onClick={() => addItem(-1)}>
