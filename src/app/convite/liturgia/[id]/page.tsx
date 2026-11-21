@@ -23,6 +23,143 @@ function isMusicalItem(title: string): boolean {
          t.includes('solo');
 }
 
+function isOfferingItem(title: string): boolean {
+  const t = (title || '').toLowerCase();
+  return t.includes('oferta') || t.includes('provai') || t.includes('fidelidade') || t.includes('dízimo') || t.includes('dizimo');
+}
+
+function isSaturdayEvent(eventDate?: string, eventTitle?: string): boolean {
+  if (eventDate) {
+    const d = new Date(eventDate.includes('T') ? eventDate : eventDate + 'T00:00:00');
+    if (!isNaN(d.getTime()) && d.getDay() === 6) return true;
+  }
+  const t = (eventTitle || '').toLowerCase();
+  return t.includes('sábado') || t.includes('sabado');
+}
+
+function PersonInputField({
+  label,
+  value,
+  onChange,
+  people,
+  placeholder,
+  helperText
+}: {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  people: { id: string; name: string }[];
+  placeholder?: string;
+  helperText?: string;
+}) {
+  const [showDrop, setShowDrop] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setShowDrop(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = people.filter(p => 
+    p.name.toLowerCase().includes(value.toLowerCase().trim())
+  );
+
+  return (
+    <div style={{ marginBottom: '16px', position: 'relative' }} ref={ref}>
+      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+        {label}
+      </label>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setShowDrop(true);
+          }}
+          onFocus={() => setShowDrop(true)}
+          placeholder={placeholder || 'Digite o nome ou busque na igreja...'}
+          style={{
+            flex: 1,
+            padding: '12px 14px',
+            borderRadius: '8px',
+            border: '1px solid #cbd5e1',
+            fontSize: '0.95rem',
+            outline: 'none',
+            boxSizing: 'border-box'
+          }}
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => { onChange(''); setShowDrop(false); }}
+            style={{
+              padding: '0 12px',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e1',
+              background: '#f8fafc',
+              color: '#64748b',
+              fontSize: '0.8rem',
+              cursor: 'pointer'
+            }}
+            title="Limpar"
+          >
+            ✖
+          </button>
+        )}
+      </div>
+      {helperText && (
+        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
+          {helperText}
+        </div>
+      )}
+
+      {showDrop && value.trim().length > 0 && filtered.length > 0 && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          backgroundColor: '#ffffff',
+          border: '1px solid #cbd5e1',
+          borderRadius: '8px',
+          marginTop: '4px',
+          boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+          maxHeight: '180px',
+          overflowY: 'auto',
+          zIndex: 60
+        }}>
+          <div style={{ padding: '6px 12px', fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', textTransform: 'uppercase' }}>
+            Membros da Igreja Santo Afonso (clique para selecionar)
+          </div>
+          {filtered.slice(0, 8).map((p) => (
+            <div
+              key={p.id}
+              onClick={() => { onChange(p.name); setShowDrop(false); }}
+              style={{
+                padding: '10px 12px',
+                fontSize: '0.9rem',
+                color: '#1e293b',
+                cursor: 'pointer',
+                borderBottom: '1px solid #f8fafc'
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
+            >
+              {p.name}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LiturgyInvitePage() {
   const params = useParams();
   const itemId = params.id as string;
@@ -34,19 +171,26 @@ export default function LiturgyInvitePage() {
   const [success, setSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Mode and form states
+  // Modos de exibição
   const [isListMode, setIsListMode] = useState(false);
+  const [isOfferingMode, setIsOfferingMode] = useState(false);
+
+  // Louvor Congregacional
   const [listSongs, setListSongs] = useState<string[]>(['', '', '']);
   const [teamSingers, setTeamSingers] = useState('');
 
-  // Individual person form state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPerson, setSelectedPerson] = useState<{ id: string; name: string } | null>(null);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [songTitle, setSongTitle] = useState('');
-  const [customNotes, setCustomNotes] = useState('');
+  // Ofertas (Provai e Vede)
+  const [diacono1, setDiacono1] = useState('');
+  const [diacono2, setDiacono2] = useState('');
+  const [oracao, setOracao] = useState('');
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  // Item Individual (Solo ou Geral)
+  const [personName, setPersonName] = useState('');
+  const [songTitle, setSongTitle] = useState('');
+
+  // Observações (agora com botão expansível)
+  const [customNotes, setCustomNotes] = useState('');
+  const [showNotesField, setShowNotesField] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -56,15 +200,16 @@ export default function LiturgyInvitePage() {
         setItem(res.item);
         setPeople(res.people || []);
 
-        if (res.item.responsible_person) {
-          setSelectedPerson(res.item.responsible_person);
-          setSearchTerm(res.item.responsible_person.name);
-        }
-
         const rawNotes = res.item.notes || '';
         let detectedList = isCongregationalPraise(res.item.title);
+        let detectedOffering = isOfferingItem(res.item.title);
+
         let initialSingers = '';
         let initialSongs: string[] = ['', '', ''];
+        let initialD1 = '';
+        let initialD2 = '';
+        let initialOracao = '';
+        let initialObs = '';
 
         if (rawNotes.trim().startsWith('{') && rawNotes.trim().endsWith('}')) {
           try {
@@ -73,29 +218,49 @@ export default function LiturgyInvitePage() {
               detectedList = true;
               initialSingers = parsed.singers || '';
               initialSongs = parsed.songs.length > 0 ? parsed.songs : ['', '', ''];
+            } else if (parsed.type === 'offering' || parsed.diacono1 !== undefined || parsed.oracao !== undefined) {
+              detectedOffering = true;
+              initialD1 = parsed.diacono1 || '';
+              initialD2 = parsed.diacono2 || '';
+              initialOracao = parsed.oracao || '';
+              initialObs = parsed.obs || '';
             } else if (parsed.singers) {
               initialSingers = parsed.singers;
             }
           } catch (e) {
-            setCustomNotes(rawNotes);
+            initialObs = rawNotes;
           }
         } else {
-          setCustomNotes(rawNotes);
+          initialObs = rawNotes;
         }
 
-        // Se o título for louvor congregacional mas não tinha notes JSON ainda
         if (detectedList && !initialSingers && res.item.responsible_person?.name) {
           initialSingers = `Responsável: ${res.item.responsible_person.name}`;
         }
 
-        // Garante pelo menos 3 campos de hinos (Hino 1, Hino 2, Hino 3)
+        if (detectedOffering && !initialD1 && res.item.responsible_person?.name) {
+          initialD1 = res.item.responsible_person.name;
+        }
+
         while (initialSongs.length < 3) {
           initialSongs.push('');
         }
 
         setIsListMode(detectedList);
+        setIsOfferingMode(detectedOffering);
+
         setTeamSingers(initialSingers);
         setListSongs(initialSongs);
+
+        setDiacono1(initialD1);
+        setDiacono2(initialD2);
+        setOracao(initialOracao);
+
+        setPersonName(res.item.responsible_person?.name || '');
+        setCustomNotes(initialObs);
+        if (initialObs.trim()) {
+          setShowNotesField(true);
+        }
       } catch (err: any) {
         console.error('Error loading invite:', err);
         setError(err.message || 'Item não encontrado ou link expirado.');
@@ -108,33 +273,6 @@ export default function LiturgyInvitePage() {
       load();
     }
   }, [itemId]);
-
-  // Click outside listener for dropdown
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const filteredPeople = people.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase().trim())
-  );
-
-  const handleSelectPerson = (person: { id: string; name: string }) => {
-    setSelectedPerson(person);
-    setSearchTerm(person.name);
-    setShowDropdown(false);
-  };
-
-  const handleClearPerson = () => {
-    setSelectedPerson(null);
-    setSearchTerm('');
-    setShowDropdown(false);
-  };
 
   const handleUpdateSong = (idx: number, val: string) => {
     const updated = [...listSongs];
@@ -160,21 +298,45 @@ export default function LiturgyInvitePage() {
     if (e) e.preventDefault();
     setSaving(true);
     try {
-      if (isListMode) {
-        // Louvores Congregacionais: salva lista de hinos e equipe
+      const isSaturday = isSaturdayEvent(item?.liturgy?.events?.date, item?.liturgy?.events?.title);
+
+      if (isOfferingMode) {
+        // Ofertas / Provai e Vede
+        if (isSaturday) {
+          if (!diacono1.trim() && !diacono2.trim() && !oracao.trim()) {
+            alert('Por favor, informe pelo menos uma pessoa para a escala de ofertas.');
+            setSaving(false);
+            return;
+          }
+        } else {
+          if (!diacono1.trim() && !oracao.trim()) {
+            alert('Por favor, informe quem fará o recolhimento das ofertas ou a oração.');
+            setSaving(false);
+            return;
+          }
+        }
+
+        await updateLiturgyItemPublic(itemId, {
+          offering_data: {
+            diacono1: diacono1.trim(),
+            diacono2: diacono2.trim(),
+            oracao: oracao.trim()
+          },
+          notes: customNotes.trim() || null
+        });
+      } else if (isListMode) {
+        // Louvores Congregacionais
         const validSongs = listSongs.map(s => s.trim());
         const finalSingers = teamSingers.trim() || 'Equipe de Louvor';
 
         await updateLiturgyItemPublic(itemId, {
-          responsible_person_id: selectedPerson ? selectedPerson.id : null,
-          custom_name: !selectedPerson && searchTerm.trim() ? searchTerm.trim() : null,
           singers: finalSingers,
           songs: validSongs,
           notes: customNotes.trim() || null
         });
       } else {
         // Itens individuais
-        if (!searchTerm.trim() && !selectedPerson) {
+        if (!personName.trim()) {
           alert('Por favor, informe seu nome ou selecione uma pessoa.');
           setSaving(false);
           return;
@@ -182,8 +344,7 @@ export default function LiturgyInvitePage() {
 
         const isMusical = isMusicalItem(item?.title || '');
         const payload: any = {
-          responsible_person_id: selectedPerson ? selectedPerson.id : null,
-          custom_name: !selectedPerson ? searchTerm.trim() : null,
+          custom_name: personName.trim(),
           notes: customNotes.trim() || null
         };
 
@@ -225,6 +386,7 @@ export default function LiturgyInvitePage() {
   }
 
   const event = item.liturgy?.events;
+  const isSaturday = isSaturdayEvent(event?.date, event?.title);
   const isMusical = isMusicalItem(item.title);
 
   return (
@@ -249,11 +411,13 @@ export default function LiturgyInvitePage() {
               ✓
             </div>
             <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
-              {isListMode ? 'Hinos Confirmados com Sucesso!' : 'Participação Confirmada!'}
+              {isOfferingMode ? 'Escala de Ofertas Confirmada!' : (isListMode ? 'Hinos Confirmados com Sucesso!' : 'Participação Confirmada!')}
             </h2>
             <p style={{ color: '#475569', fontSize: '0.95rem', lineHeight: '1.5', marginBottom: '20px' }}>
-              {isListMode ? (
-                <>Muito obrigado! Os hinos para o <strong>Louvor Congregacional</strong> foram atualizados e já estão visíveis na programação do <strong>{event?.title || 'Culto'}</strong>.</>
+              {isOfferingMode ? (
+                <>Muito obrigado! A escala para <strong>{item.title}</strong> foi atualizada e já está sincronizada na agenda do <strong>{event?.title || 'Culto'}</strong>.</>
+              ) : isListMode ? (
+                <>Muito obrigado! Os hinos para o <strong>Louvor Congregacional</strong> foram atualizados e já estão na programação do <strong>{event?.title || 'Culto'}</strong>.</>
               ) : (
                 <>Muito obrigado! O responsável por <strong>{item.title}</strong> foi registrado com sucesso na agenda do <strong>{event?.title || 'Culto'}</strong>.</>
               )}
@@ -261,14 +425,21 @@ export default function LiturgyInvitePage() {
             
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0', textAlign: 'left', marginBottom: '24px' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '6px' }}>Resumo da escala</div>
-              {isListMode ? (
+              
+              {isOfferingMode ? (
+                <div style={{ fontSize: '0.9rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {diacono1 && <div><strong>Diácono 1:</strong> {diacono1}</div>}
+                  {diacono2 && <div><strong>Diácono 2:</strong> {diacono2}</div>}
+                  {oracao && <div><strong>Oração:</strong> {oracao}</div>}
+                </div>
+              ) : isListMode ? (
                 <>
                   <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b', marginBottom: '8px' }}>
                     🎤 {teamSingers || 'Equipe de Louvor'}
                   </div>
                   <div style={{ fontSize: '0.88rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     {listSongs.filter(s => s && s.trim()).map((s, idx) => (
-                      <div key={idx} style={{ padding: '4px 0', borderBottom: idx < listSongs.filter(x => x.trim()).length - 1 ? '1px dashed #e2e8f0' : 'none' }}>
+                      <div key={idx} style={{ padding: '3px 0' }}>
                         <span style={{ fontWeight: 700, color: '#4f46e5' }}>Hino {idx + 1}:</span> {s}
                       </div>
                     ))}
@@ -276,11 +447,12 @@ export default function LiturgyInvitePage() {
                 </>
               ) : (
                 <>
-                  <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b' }}>👤 {selectedPerson?.name || searchTerm}</div>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b' }}>👤 {personName}</div>
                   <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '2px' }}>📌 {item.title}</div>
                   {songTitle && <div style={{ fontSize: '0.85rem', color: '#4f46e5', marginTop: '4px' }}>🎵 {songTitle}</div>}
                 </>
               )}
+
               {customNotes && <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '6px', fontStyle: 'italic' }}>💬 "{customNotes}"</div>}
             </div>
 
@@ -323,8 +495,49 @@ export default function LiturgyInvitePage() {
 
             <form onSubmit={handleSave}>
 
-              {/* CENÁRIO 1: LOUVOR CONGREGACIONAL (Equipe de Louvor e Hinos 1, 2, 3) */}
-              {isListMode ? (
+              {/* CENÁRIO 1: OFERTAS / PROVAI E VEDE */}
+              {isOfferingMode ? (
+                <>
+                  <div style={{ marginBottom: '16px', background: '#f0fdf4', padding: '12px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#166534', marginBottom: '2px' }}>
+                      💰 Escala de Dízimos e Ofertas ({isSaturday ? 'Sábado' : 'Culto Regular'}):
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#15803d' }}>
+                      {isSaturday 
+                        ? 'No sábado, escalam-se 2 diáconos para recolher e 1 pessoa para fazer a oração.' 
+                        : 'No domingo/quarta, 1 ou 2 pessoas fazem o recolhimento e a oração.'}
+                    </div>
+                  </div>
+
+                  {/* Diácono 1 */}
+                  <PersonInputField
+                    label={isSaturday ? '1. Diácono 1 (Recolher ofertas):' : '1. Diácono / Responsável (Recolher ofertas):'}
+                    value={diacono1}
+                    onChange={setDiacono1}
+                    people={people}
+                    placeholder="Digite o nome ou busque na igreja..."
+                  />
+
+                  {/* Diácono 2 */}
+                  <PersonInputField
+                    label={isSaturday ? '2. Diácono 2 (Recolher ofertas):' : '2. Diácono 2 (Opcional):'}
+                    value={diacono2}
+                    onChange={setDiacono2}
+                    people={people}
+                    placeholder={isSaturday ? 'Digite o nome do segundo diácono...' : 'Opcional (se houver segundo diácono)...'}
+                  />
+
+                  {/* Oração das Ofertas */}
+                  <PersonInputField
+                    label={isSaturday ? '3. Oração das Ofertas (Orador da oração):' : 'Oração das Ofertas (Opcional):'}
+                    value={oracao}
+                    onChange={setOracao}
+                    people={people}
+                    placeholder={isSaturday ? 'Quem fará a oração das ofertas...' : 'Deixe em branco se for o próprio diácono...'}
+                  />
+                </>
+              ) : isListMode ? (
+                /* CENÁRIO 2: LOUVORES CONGREGACIONAIS */
                 <>
                   {/* Cantores / Equipe que vai puxar */}
                   <div style={{ marginBottom: '18px' }}>
@@ -427,151 +640,17 @@ export default function LiturgyInvitePage() {
                       + Adicionar Hino
                     </button>
                   </div>
-
-                  {/* Campo de Observações */}
-                  <div style={{ marginBottom: '24px' }}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      💬 Observações ou recado para a equipe (opcional):
-                    </label>
-                    <textarea
-                      value={customNotes}
-                      onChange={(e) => setCustomNotes(e.target.value)}
-                      placeholder="Ex: Teremos ensaio 30 min antes / Instrumento: violão"
-                      rows={2}
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        borderRadius: '8px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: '0.9rem',
-                        boxSizing: 'border-box',
-                        resize: 'vertical'
-                      }}
-                    />
-                  </div>
-
-                  {/* Botão de Envio */}
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    style={{
-                      width: '100%',
-                      padding: '14px',
-                      borderRadius: '10px',
-                      backgroundColor: '#4f46e5',
-                      color: 'white',
-                      fontWeight: 800,
-                      fontSize: '1rem',
-                      border: 'none',
-                      cursor: saving ? 'not-allowed' : 'pointer',
-                      boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
-                      transition: 'background 0.2s'
-                    }}
-                  >
-                    {saving ? 'Salvando...' : '✅ Salvar Hinos e Confirmar'}
-                  </button>
                 </>
               ) : (
-                /* CENÁRIO 2: ITENS INDIVIDUAIS (História das Crianças, Solo, Pregação, etc.) */
+                /* CENÁRIO 3: ITENS INDIVIDUAIS (História das Crianças, Solo, Pregação, etc.) */
                 <>
-                  <div style={{ marginBottom: '16px', position: 'relative' }} ref={dropdownRef}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      {isMusical ? '👤 Nome do Cantor(a) ou Grupo:' : '👤 Quem vai fazer esta parte? (Seu Nome):'}
-                    </label>
-                    
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => {
-                          setSearchTerm(e.target.value);
-                          setSelectedPerson(null);
-                          setShowDropdown(true);
-                        }}
-                        onFocus={() => setShowDropdown(true)}
-                        placeholder="Digite seu nome ou busque na igreja..."
-                        style={{
-                          flex: 1,
-                          padding: '12px 14px',
-                          borderRadius: '8px',
-                          border: '1px solid #cbd5e1',
-                          fontSize: '0.95rem',
-                          outline: 'none',
-                          backgroundColor: selectedPerson ? '#f0fdf4' : '#ffffff',
-                          borderColor: selectedPerson ? '#86efac' : '#cbd5e1'
-                        }}
-                      />
-                      {searchTerm && (
-                        <button
-                          type="button"
-                          onClick={handleClearPerson}
-                          style={{
-                            padding: '0 12px',
-                            borderRadius: '8px',
-                            border: '1px solid #cbd5e1',
-                            background: '#f8fafc',
-                            color: '#64748b',
-                            fontSize: '0.8rem',
-                            cursor: 'pointer'
-                          }}
-                          title="Limpar"
-                        >
-                          ✖
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Status indicator abaixo do input */}
-                    {selectedPerson ? (
-                      <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 600, marginTop: '4px' }}>
-                        ✅ Membro vinculado: {selectedPerson.name}
-                      </div>
-                    ) : searchTerm.trim() ? (
-                      <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '4px' }}>
-                        ✍️ Será registrado como: <strong>{searchTerm.trim()}</strong>
-                      </div>
-                    ) : null}
-
-                    {/* Dropdown de Sugestões de Membros da Igreja */}
-                    {showDropdown && searchTerm.trim().length > 0 && filteredPeople.length > 0 && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '8px',
-                        marginTop: '4px',
-                        boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
-                        maxHeight: '200px',
-                        overflowY: 'auto',
-                        zIndex: 50
-                      }}>
-                        <div style={{ padding: '6px 12px', fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', background: '#f8fafc', borderBottom: '1px solid #f1f5f9', textTransform: 'uppercase' }}>
-                          Membros da Igreja Santo Afonso (clique se for você)
-                        </div>
-                        {filteredPeople.slice(0, 10).map((p) => (
-                          <div
-                            key={p.id}
-                            onClick={() => handleSelectPerson(p)}
-                            style={{
-                              padding: '10px 12px',
-                              fontSize: '0.9rem',
-                              color: '#1e293b',
-                              cursor: 'pointer',
-                              borderBottom: '1px solid #f8fafc',
-                              transition: 'background 0.15s'
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
-                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
-                          >
-                            {p.name}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <PersonInputField
+                    label={isMusical ? '👤 Nome do Cantor(a) ou Grupo:' : '👤 Quem vai fazer esta parte? (Seu Nome):'}
+                    value={personName}
+                    onChange={setPersonName}
+                    people={people}
+                    placeholder="Digite seu nome ou busque na igreja..."
+                  />
 
                   {/* Se for solo/especial: título da música */}
                   {isMusical && (
@@ -595,53 +674,95 @@ export default function LiturgyInvitePage() {
                       />
                     </div>
                   )}
+                </>
+              )}
 
-                  {/* Campo de Observações / Detalhes */}
-                  <div style={{ marginBottom: '24px' }}>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      💬 Observações ou recado para a organização (opcional):
-                    </label>
+              {/* CAMPO DE OBSERVAÇÕES: BOTÃO EXPANSÍVEL (GERAL) */}
+              <div style={{ marginTop: '12px', marginBottom: '24px' }}>
+                {showNotesField ? (
+                  <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#334155' }}>
+                        💬 Observações ou pedido especial (opcional):
+                      </label>
+                      {!customNotes.trim() && (
+                        <button 
+                          type="button" 
+                          onClick={() => setShowNotesField(false)}
+                          style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.75rem', cursor: 'pointer' }}
+                        >
+                          Ocultar
+                        </button>
+                      )}
+                    </div>
                     <textarea
                       value={customNotes}
                       onChange={(e) => setCustomNotes(e.target.value)}
-                      placeholder="Ex: Preciso de microfone sem fio / Tema da historinha: A Arca de Noé"
+                      placeholder="Ex: Preciso de microfone sem fio / Tema: A Arca de Noé"
                       rows={2}
+                      autoFocus
                       style={{
                         width: '100%',
-                        padding: '10px 14px',
-                        borderRadius: '8px',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
                         border: '1px solid #cbd5e1',
-                        fontSize: '0.9rem',
+                        fontSize: '0.88rem',
                         boxSizing: 'border-box',
                         resize: 'vertical'
                       }}
                     />
                   </div>
-
-                  {/* Botão de Envio */}
+                ) : (
                   <button
-                    type="submit"
-                    disabled={saving || (!searchTerm.trim() && !selectedPerson)}
+                    type="button"
+                    onClick={() => setShowNotesField(true)}
                     style={{
+                      background: 'none',
+                      border: '1px dashed #cbd5e1',
+                      borderRadius: '8px',
+                      padding: '8px 14px',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      color: '#64748b',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
                       width: '100%',
-                      padding: '14px',
-                      borderRadius: '10px',
-                      backgroundColor: '#4f46e5',
-                      color: 'white',
-                      fontWeight: 800,
-                      fontSize: '1rem',
-                      border: 'none',
-                      cursor: (saving || (!searchTerm.trim() && !selectedPerson)) ? 'not-allowed' : 'pointer',
-                      opacity: (saving || (!searchTerm.trim() && !selectedPerson)) ? 0.6 : 1,
-                      boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
-                      transition: 'background 0.2s'
+                      justifyContent: 'center',
+                      transition: 'all 0.15s'
                     }}
                   >
-                    {saving ? 'Salvando...' : '✅ Confirmar Participação'}
+                    💬 Tem alguma observação ou pedido especial? (Opcional)
                   </button>
-                </>
-              )}
+                )}
+              </div>
 
+              {/* Botão de Envio Principal */}
+              <button
+                type="submit"
+                disabled={saving}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  borderRadius: '10px',
+                  backgroundColor: '#4f46e5',
+                  color: 'white',
+                  fontWeight: 800,
+                  fontSize: '1rem',
+                  border: 'none',
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  opacity: saving ? 0.6 : 1,
+                  boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                  transition: 'background 0.2s'
+                }}
+              >
+                {saving ? 'Salvando...' : (
+                  isOfferingMode ? '✅ Confirmar Escala de Ofertas' :
+                  isListMode ? '✅ Salvar Hinos e Confirmar' :
+                  '✅ Confirmar Participação'
+                )}
+              </button>
             </form>
 
           </div>

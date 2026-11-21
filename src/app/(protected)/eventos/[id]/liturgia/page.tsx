@@ -24,6 +24,8 @@ interface LocalLiturgyItem {
   notes?: string;
   is_list?: boolean;
   list_data?: { singers: string; songs: string[] };
+  is_offering?: boolean;
+  offering_data?: { diacono1?: string; diacono2?: string; oracao?: string };
 }
 
 function fixCapitalization(str: string): string {
@@ -111,26 +113,71 @@ function isMusicalItem(title: string): boolean {
          t.includes('solo');
 }
 
+function isOfferingItem(title: string): boolean {
+  const t = (title || '').toLowerCase();
+  return t.includes('oferta') || t.includes('provai') || t.includes('fidelidade') || t.includes('dízimo') || t.includes('dizimo');
+}
+
+function isSaturdayEvent(eventDate?: string, eventTitle?: string): boolean {
+  if (eventDate) {
+    const d = new Date(eventDate.includes('T') ? eventDate : eventDate + 'T00:00:00');
+    if (!isNaN(d.getTime()) && d.getDay() === 6) return true;
+  }
+  const t = (eventTitle || '').toLowerCase();
+  return t.includes('sábado') || t.includes('sabado');
+}
+
+function formatOfferingNames(data?: { diacono1?: string; diacono2?: string; oracao?: string }): string {
+  if (!data) return '';
+  const parts = [];
+  const diaconos = [data.diacono1, data.diacono2].filter(Boolean).map(n => n!.trim()).filter(Boolean);
+  if (diaconos.length > 0) {
+    parts.push(diaconos.length === 1 ? `Recolhe: ${diaconos[0]}` : `Recolhem: ${diaconos.join(' e ')}`);
+  }
+  if (data.oracao && data.oracao.trim()) {
+    parts.push(`Oração: ${data.oracao.trim()}`);
+  }
+  return parts.join(' | ');
+}
+
 export const isNoOne = (item: LocalLiturgyItem) => {
   const pName = (item.person_name || '').trim().toLowerCase();
   const notes = (item.notes || '').trim().toLowerCase();
   const singers = (item.list_data?.singers || '').trim().toLowerCase();
+  const d1 = (item.offering_data?.diacono1 || '').trim().toLowerCase();
   return pName === 'não haverá' ||
+    pName === 'nao havera' ||
     pName === 'sem responsável' ||
+    pName === 'sem responsavel' ||
     pName === 'ninguém' ||
+    pName === 'ninguem' ||
     pName === 'dispensado' ||
     notes === 'sem_responsavel' ||
     singers === 'não haverá' ||
     singers === 'sem responsável' ||
     singers === 'ninguém' ||
-    singers === 'dispensado';
+    singers === 'dispensado' ||
+    d1 === 'não haverá' ||
+    d1 === 'nao havera' ||
+    d1 === 'dispensado';
 };
 
-export const isItemPending = (item: LocalLiturgyItem) => {
+export const isItemPending = (item: LocalLiturgyItem, isSaturday: boolean = false) => {
   if (isNoOne(item)) return false;
 
   if (item.is_list) {
     return !item.list_data?.singers?.trim();
+  }
+
+  if (item.is_offering || isOfferingItem(item.title)) {
+    const off = item.offering_data;
+    if (off) {
+      if (isSaturday) {
+        return !off.diacono1?.trim() && !off.diacono2?.trim() && !off.oracao?.trim();
+      } else {
+        return !off.diacono1?.trim() && !off.oracao?.trim() && !item.person_name?.trim();
+      }
+    }
   }
 
   return !item.person_id && !item.person_name?.trim();
@@ -149,6 +196,7 @@ export default function LiturgyBuilderPage() {
   const [copied, setCopied] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [churchPeople, setChurchPeople] = useState<{ id: string; name: string }[]>([]);
 
   const supabase = createClient();
   const { addToast } = useToast();
@@ -185,6 +233,14 @@ export default function LiturgyBuilderPage() {
 
       if (evError) throw evError;
       setEvent(evData);
+
+      // Fetch church people for datalists/autocomplete
+      const { data: pData } = await supabase
+        .from('people')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+      if (pData) setChurchPeople(pData);
 
       // 2. Check if Liturgy exists
       const { data: litData } = await supabase
@@ -250,6 +306,8 @@ export default function LiturgyBuilderPage() {
             let isList = false;
             let listData = { singers: '', songs: ['', ''] };
             let textNotes = i.notes || '';
+            let isOffering = false;
+            let offeringData = { diacono1: '', diacono2: '', oracao: '' };
 
             if (textNotes.trim().startsWith('{') && textNotes.trim().endsWith('}')) {
               try {
@@ -260,10 +318,25 @@ export default function LiturgyBuilderPage() {
                     songs: parsed.songs.length > 0 ? parsed.songs : ['', '']
                   };
                   isList = true;
+                } else if (parsed.type === 'offering' || parsed.diacono1 !== undefined || parsed.oracao !== undefined) {
+                  isOffering = true;
+                  offeringData = {
+                    diacono1: parsed.diacono1 || '',
+                    diacono2: parsed.diacono2 || '',
+                    oracao: parsed.oracao || ''
+                  };
+                  textNotes = parsed.obs || '';
                 }
               } catch (e) { }
             } else if (isCongregationalPraise(t)) {
               isList = true;
+            } else if (isOfferingItem(t)) {
+              isOffering = true;
+              offeringData = {
+                diacono1: pName || '',
+                diacono2: '',
+                oracao: ''
+              };
             }
 
             if (isList && (!listData.singers || listData.singers === '')) {
@@ -296,16 +369,25 @@ export default function LiturgyBuilderPage() {
               }
             }
 
+            let finalDisplayName = pName;
+            if (isList) {
+              finalDisplayName = '';
+            } else if (isOffering) {
+              finalDisplayName = formatOfferingNames(offeringData) || pName || '';
+            }
+
             return {
               id: i.id,
               title: i.title,
               duration_minutes: i.duration_minutes,
               order_index: i.order_index,
-              person_id: isList ? null : pId,
-              person_name: isList ? '' : pName,
+              person_id: (isList || isOffering) ? null : pId,
+              person_name: finalDisplayName,
               notes: isList ? '' : textNotes,
               is_list: isList,
               list_data: listData,
+              is_offering: isOffering,
+              offering_data: offeringData,
               calculated_time: i.calculated_time
             };
           });
@@ -593,16 +675,28 @@ export default function LiturgyBuilderPage() {
         singersStr = parts.join(' | ');
       }
 
+      const isOffering = isOfferingItem(item.title);
+      let offeringData = { diacono1: '', diacono2: '', oracao: '' };
+      if (isOffering) {
+        offeringData = {
+          diacono1: item.person?.name || '',
+          diacono2: '',
+          oracao: ''
+        };
+      }
+
       return {
         title: item.title,
         duration_minutes: item.duration,
         order_index: idx + 1,
-        person_id: isList ? null : (item.person?.id || null),
-        person_name: isList ? '' : (item.person?.name || ''),
+        person_id: (isList || isOffering) ? null : (item.person?.id || null),
+        person_name: isList ? '' : (isOffering ? formatOfferingNames(offeringData) : (item.person?.name || '')),
         emoji: item.emoji,
         notes: '',
         is_list: isList,
-        list_data: isList ? { singers: singersStr, songs: ['', ''] } : { singers: '', songs: [''] }
+        list_data: isList ? { singers: singersStr, songs: ['', ''] } : { singers: '', songs: [''] },
+        is_offering: isOffering,
+        offering_data: offeringData
       };
     });
 
@@ -622,6 +716,14 @@ export default function LiturgyBuilderPage() {
         if (validSongs.length > 0 || i.list_data.singers.trim()) {
           finalNotes = JSON.stringify({ singers: i.list_data.singers, songs: validSongs });
         }
+      } else if ((i.is_offering || isOfferingItem(i.title)) && i.offering_data) {
+        finalNotes = JSON.stringify({
+          type: 'offering',
+          diacono1: (i.offering_data.diacono1 || '').trim(),
+          diacono2: (i.offering_data.diacono2 || '').trim(),
+          oracao: (i.offering_data.oracao || '').trim(),
+          obs: (i.notes || '').trim()
+        });
       }
       return {
         liturgy_id: lid,
@@ -676,6 +778,11 @@ export default function LiturgyBuilderPage() {
         newItems[index].is_list = true;
         if (!newItems[index].list_data || !newItems[index].list_data?.songs?.length) {
           newItems[index].list_data = { singers: '', songs: ['', ''] };
+        }
+      } else if (isOfferingItem(t)) {
+        newItems[index].is_offering = true;
+        if (!newItems[index].offering_data) {
+          newItems[index].offering_data = { diacono1: '', diacono2: '', oracao: '' };
         }
       }
     }
@@ -765,6 +872,13 @@ export default function LiturgyBuilderPage() {
         ...item,
         list_data: { ...data, singers: noOne ? 'Não haverá' : '' }
       };
+    } else if (item.is_offering || isOfferingItem(item.title)) {
+      newItems[index] = {
+        ...item,
+        person_id: null,
+        person_name: noOne ? 'Não haverá' : '',
+        offering_data: noOne ? { diacono1: 'Não haverá', diacono2: '', oracao: '' } : { diacono1: '', diacono2: '', oracao: '' }
+      };
     } else {
       newItems[index] = {
         ...item,
@@ -774,6 +888,18 @@ export default function LiturgyBuilderPage() {
     }
     const calculated = calculateLiturgyTimes(newItems, event.start_time) as LocalLiturgyItem[];
     setItems(calculated);
+  };
+
+  const handleUpdateOffering = (index: number, field: 'diacono1' | 'diacono2' | 'oracao', value: string) => {
+    const newItems = [...items];
+    const item = newItems[index];
+    const off = { ...(item.offering_data || { diacono1: '', diacono2: '', oracao: '' }), [field]: value };
+    newItems[index] = {
+      ...item,
+      offering_data: off,
+      person_name: formatOfferingNames(off)
+    };
+    setItems(newItems);
   };
 
   const handleSave = async () => {
@@ -817,7 +943,15 @@ export default function LiturgyBuilderPage() {
       let personStr = formattedPerson ? ` (${formattedPerson})` : '';
 
       let notesStr = '';
-      if (item.is_list && item.list_data) {
+      if ((item.is_offering || isOfferingItem(item.title)) && item.offering_data) {
+        const offText = formatOfferingNames(item.offering_data);
+        if (offText) {
+          personStr = ` (${offText})`;
+        }
+        if (item.notes && item.notes.trim()) {
+          notesStr = `\n▪️ ${item.notes.replace(/\n/g, '\n▪️ ')}`;
+        }
+      } else if (item.is_list && item.list_data) {
         if (item.list_data.singers) {
           // If they typed singers, we replace the "personStr" with the singers text directly.
           // In their print, it was "Louvores Congregacionais Equipe de louvor"
@@ -959,7 +1093,9 @@ export default function LiturgyBuilderPage() {
 
         <div className="liturgy-builder" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {items.map((item, idx) => {
-            const isPending = isItemPending(item);
+            const isSaturday = isSaturdayEvent(event?.date, event?.title);
+            const isOffering = item.is_offering || isOfferingItem(item.title);
+            const isPending = isItemPending(item, isSaturday);
             const isNone = isNoOne(item);
             const isMusical = isMusicalItem(item.title);
 
@@ -1102,8 +1238,8 @@ export default function LiturgyBuilderPage() {
                     </div>
                   </div>
 
-                  {/* Alternador de Modo: APENAS PARA ITENS DE LOUVOR/MÚSICA */}
-                  {(isMusical || item.is_list) && (
+                  {/* Alternador de Modo: APENAS PARA ITENS DE LOUVOR/MÚSICA (não para ofertas) */}
+                  {(isMusical || item.is_list) && !isOffering && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '2px 0' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
                         {item.is_list ? '🎤 Modo: Equipe de Louvor (Lista de Hinos)' : '👤 Modo: Cantor(a) Individual'}
@@ -1120,7 +1256,107 @@ export default function LiturgyBuilderPage() {
                     </div>
                   )}
 
-                  {!item.is_list && (
+                  {/* BLOCO DE OFERTAS DEDICADO (Sábado vs Outros Dias) */}
+                  {isOffering && !item.is_list ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)', border: isPending ? '1px solid var(--danger-light, #fca5a5)' : '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                        <label style={{ fontSize: '0.82rem', fontWeight: 700, color: isPending ? 'var(--danger-dark, #b91c1c)' : 'var(--text)' }}>
+                          💰 {isSaturday ? 'Escala de Ofertas do Sábado (2 Diáconos + Oração)' : 'Escala de Ofertas'}
+                        </label>
+                        {item.id && (
+                          <button
+                            type="button"
+                            className="btn btn-success btn-sm"
+                            style={{ padding: '3px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: '6px' }}
+                            title="Copiar Link de Convite exclusivo para enviar aos responsáveis pelas ofertas"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const link = `${window.location.origin}/convite/liturgia/${item.id}`;
+                              await navigator.clipboard.writeText(link);
+                              setCopiedId(item.id || null);
+                              addToast({ type: 'success', title: 'Link de convite copiado!' });
+                              setTimeout(() => setCopiedId(null), 3000);
+                            }}
+                          >
+                            {copiedId === item.id ? '✅ Link Copiado!' : '🔗 Copiar Link'}
+                          </button>
+                        )}
+                      </div>
+
+                      {isSaturday ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
+                          <div>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '3px' }}>
+                              Diácono 1 (Recolhe ofertas):
+                            </label>
+                            <input
+                              type="text"
+                              list="church-members-list"
+                              className="form-input form-input-sm"
+                              placeholder="Nome do Diácono 1..."
+                              value={item.offering_data?.diacono1 || ''}
+                              onChange={(e) => handleUpdateOffering(idx, 'diacono1', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '3px' }}>
+                              Diácono 2 (Recolhe ofertas):
+                            </label>
+                            <input
+                              type="text"
+                              list="church-members-list"
+                              className="form-input form-input-sm"
+                              placeholder="Nome do Diácono 2..."
+                              value={item.offering_data?.diacono2 || ''}
+                              onChange={(e) => handleUpdateOffering(idx, 'diacono2', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '3px' }}>
+                              Oração das Ofertas:
+                            </label>
+                            <input
+                              type="text"
+                              list="church-members-list"
+                              className="form-input form-input-sm"
+                              placeholder="Quem vai orar..."
+                              value={item.offering_data?.oracao || ''}
+                              onChange={(e) => handleUpdateOffering(idx, 'oracao', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
+                          <div>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '3px' }}>
+                              Diácono / Recolhe ofertas:
+                            </label>
+                            <input
+                              type="text"
+                              list="church-members-list"
+                              className="form-input form-input-sm"
+                              placeholder="Quem vai recolher..."
+                              value={item.offering_data?.diacono1 || ''}
+                              onChange={(e) => handleUpdateOffering(idx, 'diacono1', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '3px' }}>
+                              Oração das Ofertas (opcional):
+                            </label>
+                            <input
+                              type="text"
+                              list="church-members-list"
+                              className="form-input form-input-sm"
+                              placeholder="Quem vai orar..."
+                              value={item.offering_data?.oracao || ''}
+                              onChange={(e) => handleUpdateOffering(idx, 'oracao', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : !item.is_list ? (
                     <div style={{ display: 'flex', gap: 'var(--space-2)', flexDirection: 'column' }}>
                       <div style={{ flex: 1 }}>
                         <label style={{ fontSize: '0.8rem', fontWeight: 600, color: isPending ? 'var(--danger-dark, #b91c1c)' : 'var(--text-secondary)', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
@@ -1171,7 +1407,7 @@ export default function LiturgyBuilderPage() {
                         )}
                       </div>
                     </div>
-                  )}
+                  ) : null}
                   
                   {item.is_list ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)', border: isPending ? '1px solid var(--danger-light, #fca5a5)' : '1px solid var(--border)' }}>
@@ -1331,7 +1567,11 @@ export default function LiturgyBuilderPage() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 'bold', fontSize: '17px', color: '#0f172a' }}>{item.title}</div>
 
-                  {item.is_list && item.list_data && item.list_data.songs && (item.list_data.songs.some(s => s && s.trim()) || item.list_data.singers) ? (
+                  {(item.is_offering || isOfferingItem(item.title)) && item.offering_data && formatOfferingNames(item.offering_data) ? (
+                    <div style={{ fontSize: '14px', color: '#475569', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      💰 <span style={{ fontWeight: 600 }}>{formatOfferingNames(item.offering_data)}</span>
+                    </div>
+                  ) : item.is_list && item.list_data && item.list_data.songs && (item.list_data.songs.some(s => s && s.trim()) || item.list_data.singers) ? (
                     <div style={{ marginTop: '6px', background: '#ffffff', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ fontSize: '13px', color: '#475569', fontWeight: 700, marginBottom: '2px' }}>🎤 {item.list_data.singers || 'Equipe'}:</div>
                       <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#334155' }}>
@@ -1353,6 +1593,13 @@ export default function LiturgyBuilderPage() {
           </div>
         </div>
       )}
+
+      {/* Datalist com os membros da igreja para autocompletar Diáconos e Oração */}
+      <datalist id="church-members-list">
+        {churchPeople.map((p) => (
+          <option key={p.id} value={p.name} />
+        ))}
+      </datalist>
     </>
   );
 }

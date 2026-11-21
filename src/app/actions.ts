@@ -115,6 +115,11 @@ export async function updateLiturgyItemPublic(itemId: string, payload: {
   notes?: string | null;
   singers?: string | null;
   songs?: string[];
+  offering_data?: {
+    diacono1?: string;
+    diacono2?: string;
+    oracao?: string;
+  };
 }) {
   const supabase = supabaseAdmin;
 
@@ -147,11 +152,19 @@ export async function updateLiturgyItemPublic(itemId: string, payload: {
 
   // If musical list with singers/songs
   let finalNotes = payload.notes || null;
-  if ((payload.singers && payload.singers.trim()) || (payload.songs && payload.songs.some(s => s && s.trim()))) {
-    const validSongs = (payload.songs || []).filter(s => s && s.trim());
+  if ((payload.singers && payload.singers.trim()) || (payload.songs && payload.songs.length > 0)) {
     finalNotes = JSON.stringify({
       singers: (payload.singers || '').trim(),
-      songs: validSongs
+      songs: payload.songs || []
+    });
+  } else if (payload.offering_data) {
+    const off = payload.offering_data;
+    finalNotes = JSON.stringify({
+      type: 'offering',
+      diacono1: (off.diacono1 || '').trim(),
+      diacono2: (off.diacono2 || '').trim(),
+      oracao: (off.oracao || '').trim(),
+      obs: (payload.notes || '').trim()
     });
   }
 
