@@ -23,7 +23,7 @@ interface LocalLiturgyItem {
   emoji?: string;
   notes?: string;
   is_list?: boolean;
-  list_data?: { singers: string; songs: string[] };
+  list_data?: { leader?: string; singers: string; songs: string[] };
   is_offering?: boolean;
   offering_data?: { diacono1?: string; diacono2?: string; oracao?: string };
 }
@@ -127,6 +127,48 @@ function isSaturdayEvent(eventDate?: string, eventTitle?: string): boolean {
   return t.includes('sábado') || t.includes('sabado');
 }
 
+function formatPraiseTeam(leader?: string, singers?: string): string {
+  const parts = [];
+  if (leader && leader.trim()) {
+    parts.push(`Responsável: ${leader.trim()}`);
+  }
+  if (singers && singers.trim()) {
+    parts.push(`Cantores: ${singers.trim()}`);
+  }
+  return parts.join(' | ');
+}
+
+function parsePraiseTeam(rawSingers?: string, rawLeader?: string): { leader: string; singers: string } {
+  let leader = (rawLeader || '').trim();
+  let singers = (rawSingers || '').trim();
+
+  if (!leader && singers) {
+    if (singers.includes('Responsável:') || singers.includes('Equipe:') || singers.includes('Cantores:')) {
+      const segments = singers.split('|').map(s => s.trim());
+      let parsedLeader = '';
+      let parsedSingers = '';
+      for (const seg of segments) {
+        if (/^respons[aá]vel:/i.test(seg)) {
+          parsedLeader = seg.replace(/^respons[aá]vel:\s*/i, '').trim();
+        } else if (/^(equipe|cantores|vocal):/i.test(seg)) {
+          parsedSingers = seg.replace(/^(equipe|cantores|vocal):\s*/i, '').trim();
+        } else if (!parsedLeader) {
+          parsedLeader = seg;
+        } else if (!parsedSingers) {
+          parsedSingers = seg;
+        }
+      }
+      leader = parsedLeader;
+      singers = parsedSingers;
+    } else if (singers.toLowerCase().startsWith('responsável:')) {
+      leader = singers.replace(/^respons[aá]vel:\s*/i, '').trim();
+      singers = '';
+    }
+  }
+
+  return { leader, singers };
+}
+
 function formatOfferingNames(data?: { diacono1?: string; diacono2?: string; oracao?: string }): string {
   if (!data) return '';
   const parts = [];
@@ -143,6 +185,7 @@ function formatOfferingNames(data?: { diacono1?: string; diacono2?: string; orac
 export const isNoOne = (item: LocalLiturgyItem) => {
   const pName = (item.person_name || '').trim().toLowerCase();
   const notes = (item.notes || '').trim().toLowerCase();
+  const leader = (item.list_data?.leader || '').trim().toLowerCase();
   const singers = (item.list_data?.singers || '').trim().toLowerCase();
   const d1 = (item.offering_data?.diacono1 || '').trim().toLowerCase();
   return pName === 'não haverá' ||
@@ -153,6 +196,8 @@ export const isNoOne = (item: LocalLiturgyItem) => {
     pName === 'ninguem' ||
     pName === 'dispensado' ||
     notes === 'sem_responsavel' ||
+    leader === 'não haverá' ||
+    leader === 'dispensado' ||
     singers === 'não haverá' ||
     singers === 'sem responsável' ||
     singers === 'ninguém' ||
@@ -166,7 +211,7 @@ export const isItemPending = (item: LocalLiturgyItem, isSaturday: boolean = fals
   if (isNoOne(item)) return false;
 
   if (item.is_list) {
-    return !item.list_data?.singers?.trim();
+    return !item.list_data?.leader?.trim() && !item.list_data?.singers?.trim();
   }
 
   if (item.is_offering || isOfferingItem(item.title)) {
@@ -304,7 +349,7 @@ export default function LiturgyBuilderPage() {
             }
 
             let isList = false;
-            let listData = { singers: '', songs: ['', ''] };
+            let listData = { leader: '', singers: '', songs: ['', ''] };
             let textNotes = i.notes || '';
             let isOffering = false;
             let offeringData = { diacono1: '', diacono2: '', oracao: '' };
@@ -313,8 +358,10 @@ export default function LiturgyBuilderPage() {
               try {
                 const parsed = JSON.parse(textNotes);
                 if (parsed.songs && Array.isArray(parsed.songs)) {
+                  const praise = parsePraiseTeam(parsed.singers, parsed.leader);
                   listData = {
-                    singers: parsed.singers || '',
+                    leader: praise.leader,
+                    singers: praise.singers,
                     songs: parsed.songs.length > 0 ? parsed.songs : ['', '']
                   };
                   isList = true;
@@ -339,21 +386,25 @@ export default function LiturgyBuilderPage() {
               };
             }
 
-            if (isList && (!listData.singers || listData.singers === '')) {
-              const leaderNameFull = findPeopleNames(['Líder de Louvor', 'Música']) || evData.worship_leader?.name;
-              const leaderName = leaderNameFull ? leaderNameFull.split(' ')[0] : null;
-
-              const teamNamesFull = evData.participants?.filter((p: any) => {
-                const rn = p.role?.name?.toLowerCase() || '';
-                return rn.includes('congregacional') || rn === 'vocal' || rn.includes('equipe');
-              }).map((p: any) => p.person?.name).filter(Boolean);
-
-              const teamNames = teamNamesFull?.length > 0 ? teamNamesFull.map((n: string) => n.split(' ')[0]).join(', ') : null;
-
-              const parts = [];
-              if (leaderName) parts.push(`Responsável: ${leaderName}`);
-              if (teamNames) parts.push(`Equipe: ${teamNames}`);
-              listData.singers = parts.join(' | ');
+            if (isList) {
+              if (!listData.leader && pName) {
+                listData.leader = pName;
+              }
+              if (!listData.leader) {
+                const leaderName = findPerson(['Líder de Louvor', 'Música'])?.name || evData.worship_leader?.name;
+                if (leaderName) {
+                  listData.leader = leaderName.split(' ')[0];
+                }
+              }
+              if (!listData.singers) {
+                const teamNamesFull = evData.participants?.filter((p: any) => {
+                  const rn = p.role?.name?.toLowerCase() || '';
+                  return rn.includes('congregacional') || rn === 'vocal' || rn.includes('equipe');
+                }).map((p: any) => p.person?.name).filter(Boolean);
+                if (teamNamesFull && teamNamesFull.length > 0) {
+                  listData.singers = teamNamesFull.map((n: string) => n.split(' ')[0]).join(', ');
+                }
+              }
             } else if ((t.includes('louvor especial') || t.includes('música especial') || t.includes('mensagem musical') || t.includes('solo')) && (!pId || pId === evData.worship_leader_id)) {
               if (solo) {
                 pId = solo.id;
@@ -657,22 +708,23 @@ export default function LiturgyBuilderPage() {
     const newItems: LocalLiturgyItem[] = initialItems.map((item, idx) => {
       const isList = Boolean(item.is_list);
 
-      let singersStr = '';
+      let listData = { leader: '', singers: '', songs: ['', ''] };
       if (isList) {
         const leaderNameFull = findPeopleNames(['Líder de Louvor', 'Música']) || ev.worship_leader?.name;
-        const leaderName = leaderNameFull ? leaderNameFull.split(' ')[0] : null;
+        const leaderName = leaderNameFull ? leaderNameFull.split(' ')[0] : '';
 
         const teamNamesFull = ev.participants?.filter((p: any) => {
           const rn = p.role?.name?.toLowerCase() || '';
           return rn.includes('congregacional') || rn === 'vocal' || rn.includes('equipe');
         }).map((p: any) => p.person?.name).filter(Boolean);
 
-        const teamNames = teamNamesFull?.length > 0 ? teamNamesFull.map((n: string) => n.split(' ')[0]).join(', ') : null;
+        const teamNames = teamNamesFull?.length > 0 ? teamNamesFull.map((n: string) => n.split(' ')[0]).join(', ') : '';
 
-        const parts = [];
-        if (leaderName) parts.push(`Responsável: ${leaderName}`);
-        if (teamNames) parts.push(`Equipe: ${teamNames}`);
-        singersStr = parts.join(' | ');
+        listData = {
+          leader: leaderName,
+          singers: teamNames,
+          songs: ['', '']
+        };
       }
 
       const isOffering = isOfferingItem(item.title);
@@ -694,7 +746,7 @@ export default function LiturgyBuilderPage() {
         emoji: item.emoji,
         notes: '',
         is_list: isList,
-        list_data: isList ? { singers: singersStr, songs: ['', ''] } : { singers: '', songs: [''] },
+        list_data: listData,
         is_offering: isOffering,
         offering_data: offeringData
       };
@@ -713,8 +765,15 @@ export default function LiturgyBuilderPage() {
       let finalNotes = i.notes || null;
       if (i.is_list && i.list_data) {
         const validSongs = i.list_data.songs.filter(s => s.trim());
-        if (validSongs.length > 0 || i.list_data.singers.trim()) {
-          finalNotes = JSON.stringify({ singers: i.list_data.singers, songs: validSongs });
+        const leader = (i.list_data.leader || '').trim();
+        const singers = (i.list_data.singers || '').trim();
+        if (validSongs.length > 0 || leader || singers) {
+          finalNotes = JSON.stringify({
+            leader,
+            singers,
+            combined_singers: formatPraiseTeam(leader, singers),
+            songs: validSongs
+          });
         }
       } else if ((i.is_offering || isOfferingItem(i.title)) && i.offering_data) {
         finalNotes = JSON.stringify({
@@ -751,7 +810,7 @@ export default function LiturgyBuilderPage() {
       ...current,
       is_list: nextIsList,
       list_data: nextIsList
-        ? (current.list_data?.songs?.length ? current.list_data : { singers: current.person_name || '', songs: ['', ''] })
+        ? (current.list_data?.songs?.length ? current.list_data : { leader: current.person_name || '', singers: '', songs: ['', ''] })
         : current.list_data
     };
     setItems(newItems);
@@ -794,9 +853,16 @@ export default function LiturgyBuilderPage() {
     setItems(calculated);
   };
 
+  const handleUpdateListLeader = (itemIndex: number, value: string) => {
+    const newItems = [...items];
+    const data = newItems[itemIndex].list_data || { leader: '', singers: '', songs: [] };
+    newItems[itemIndex].list_data = { ...data, leader: value };
+    setItems(newItems);
+  };
+
   const handleUpdateListSingers = (itemIndex: number, value: string) => {
     const newItems = [...items];
-    const data = newItems[itemIndex].list_data || { singers: '', songs: [] };
+    const data = newItems[itemIndex].list_data || { leader: '', singers: '', songs: [] };
     newItems[itemIndex].list_data = { ...data, singers: value };
     setItems(newItems);
   };
@@ -867,10 +933,10 @@ export default function LiturgyBuilderPage() {
     const newItems = [...items];
     const item = newItems[index];
     if (item.is_list) {
-      const data = item.list_data || { singers: '', songs: [] };
+      const data = item.list_data || { leader: '', singers: '', songs: [] };
       newItems[index] = {
         ...item,
-        list_data: { ...data, singers: noOne ? 'Não haverá' : '' }
+        list_data: { ...data, leader: noOne ? 'Não haverá' : '', singers: '' }
       };
     } else if (item.is_offering || isOfferingItem(item.title)) {
       newItems[index] = {
@@ -952,10 +1018,9 @@ export default function LiturgyBuilderPage() {
           notesStr = `\n▪️ ${item.notes.replace(/\n/g, '\n▪️ ')}`;
         }
       } else if (item.is_list && item.list_data) {
-        if (item.list_data.singers) {
-          // If they typed singers, we replace the "personStr" with the singers text directly.
-          // In their print, it was "Louvores Congregacionais Equipe de louvor"
-          personStr = ` ${item.list_data.singers}`;
+        const teamDesc = formatPraiseTeam(item.list_data.leader, item.list_data.singers);
+        if (teamDesc) {
+          personStr = ` (${teamDesc})`;
         }
         const validSongs = item.list_data.songs.filter(s => s.trim());
         if (validSongs.length > 0) {
@@ -1412,36 +1477,60 @@ export default function LiturgyBuilderPage() {
                   {item.is_list ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', backgroundColor: 'var(--background-secondary)', borderRadius: 'var(--radius-md)', border: isPending ? '1px solid var(--danger-light, #fca5a5)' : '1px solid var(--border)' }}>
 
-                      <div style={{ marginBottom: '8px' }}>
-                        <label style={{ fontSize: '0.8rem', fontWeight: 600, color: isPending ? 'var(--danger-dark, #b91c1c)' : 'var(--text-secondary)', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                          <span>{isPending ? '⚠️ Cantores (Pendente):' : 'Cantores (Equipe que vai puxar os hinos)'}</span>
-                          {item.id && (
-                            <button
-                              type="button"
-                              className="btn btn-success btn-sm"
-                              style={{ padding: '3px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: '6px' }}
-                              title="Copiar Link de Convite exclusivo para enviar à equipe"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                const link = `${window.location.origin}/convite/liturgia/${item.id}`;
-                                await navigator.clipboard.writeText(link);
-                                setCopiedId(item.id || null);
-                                addToast({ type: 'success', title: 'Link de convite copiado!' });
-                                setTimeout(() => setCopiedId(null), 3000);
-                              }}
-                            >
-                              {copiedId === item.id ? '✅ Link Copiado!' : '🔗 Copiar Link'}
-                            </button>
-                          )}
-                        </label>
-                        <input 
-                          type="text" 
-                          className="form-input form-input-sm" 
-                          placeholder="Ex: Natan, Maria e João" 
-                          value={item.list_data?.singers || ''} 
-                          onChange={e => handleUpdateListSingers(idx, e.target.value)}
-                          style={{ fontSize: '0.9rem', fontWeight: 500 }}
-                        />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: isPending ? 'var(--danger-dark, #b91c1c)' : 'var(--text)' }}>
+                          🎼 Louvor Congregacional (Responsável + Cantores):
+                        </span>
+                        {item.id && (
+                          <button
+                            type="button"
+                            className="btn btn-success btn-sm"
+                            style={{ padding: '3px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px', borderRadius: '6px' }}
+                            title="Copiar Link de Convite exclusivo para enviar à equipe"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const link = `${window.location.origin}/convite/liturgia/${item.id}`;
+                              await navigator.clipboard.writeText(link);
+                              setCopiedId(item.id || null);
+                              addToast({ type: 'success', title: 'Link de convite copiado!' });
+                              setTimeout(() => setCopiedId(null), 3000);
+                            }}
+                          >
+                            {copiedId === item.id ? '✅ Link Copiado!' : '🔗 Copiar Link'}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Grid com Responsável e Cantores separados */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px', marginBottom: '8px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '3px' }}>
+                            👤 Responsável pelo Louvor:
+                          </label>
+                          <input 
+                            type="text" 
+                            list="church-members-list"
+                            className="form-input form-input-sm" 
+                            placeholder="Ex: Maria Eduarda" 
+                            value={item.list_data?.leader || ''} 
+                            onChange={e => handleUpdateListLeader(idx, e.target.value)}
+                            style={{ fontSize: '0.88rem', fontWeight: 500 }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '3px' }}>
+                            🎤 Cantores (Equipe que vai puxar junto):
+                          </label>
+                          <input 
+                            type="text" 
+                            list="church-members-list"
+                            className="form-input form-input-sm" 
+                            placeholder="Ex: Lucas, Ana, Banda..." 
+                            value={item.list_data?.singers || ''} 
+                            onChange={e => handleUpdateListSingers(idx, e.target.value)}
+                            style={{ fontSize: '0.88rem', fontWeight: 500 }}
+                          />
+                        </div>
                       </div>
 
                       <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
@@ -1571,9 +1660,11 @@ export default function LiturgyBuilderPage() {
                     <div style={{ fontSize: '14px', color: '#475569', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       💰 <span style={{ fontWeight: 600 }}>{formatOfferingNames(item.offering_data)}</span>
                     </div>
-                  ) : item.is_list && item.list_data && item.list_data.songs && (item.list_data.songs.some(s => s && s.trim()) || item.list_data.singers) ? (
+                  ) : item.is_list && item.list_data && (item.list_data.songs?.some(s => s && s.trim()) || item.list_data.leader || item.list_data.singers) ? (
                     <div style={{ marginTop: '6px', background: '#ffffff', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: '13px', color: '#475569', fontWeight: 700, marginBottom: '2px' }}>🎤 {item.list_data.singers || 'Equipe'}:</div>
+                      <div style={{ fontSize: '13px', color: '#475569', fontWeight: 700, marginBottom: '2px' }}>
+                        🎤 {formatPraiseTeam(item.list_data.leader, item.list_data.singers) || 'Equipe'}:
+                      </div>
                       <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#334155' }}>
                         {item.list_data.songs.filter(s => s && s.trim()).map((song, i) => (
                           <li key={i} style={{ marginBottom: '2px' }}>{song}</li>

@@ -112,6 +112,7 @@ export async function getLiturgyItemPublic(itemId: string) {
 export async function updateLiturgyItemPublic(itemId: string, payload: {
   responsible_person_id?: string | null;
   custom_name?: string | null;
+  leader?: string | null;
   notes?: string | null;
   singers?: string | null;
   songs?: string[];
@@ -124,24 +125,24 @@ export async function updateLiturgyItemPublic(itemId: string, payload: {
   const supabase = supabaseAdmin;
 
   let finalPersonId = payload.responsible_person_id || null;
+  const nameToMatch = (payload.custom_name || payload.leader || '').trim();
 
-  // If a custom name was typed and no person ID selected:
-  if (!finalPersonId && payload.custom_name && payload.custom_name.trim()) {
-    const trimmed = payload.custom_name.trim();
+  // If a custom name or leader was typed and no person ID selected:
+  if (!finalPersonId && nameToMatch) {
     // Check if person exists in people table
     const { data: existing } = await supabase
       .from('people')
       .select('id')
-      .ilike('name', trimmed)
+      .ilike('name', nameToMatch)
       .maybeSingle();
 
     if (existing) {
       finalPersonId = existing.id;
-    } else {
-      // Create new person in people table
+    } else if (payload.custom_name && payload.custom_name.trim()) {
+      // Create new person in people table only for individual custom names
       const { data: newPerson, error: pError } = await supabase
         .from('people')
-        .insert({ name: trimmed, is_active: true })
+        .insert({ name: payload.custom_name.trim(), is_active: true })
         .select('id')
         .single();
       if (!pError && newPerson) {
@@ -152,9 +153,20 @@ export async function updateLiturgyItemPublic(itemId: string, payload: {
 
   // If musical list with singers/songs
   let finalNotes = payload.notes || null;
-  if ((payload.singers && payload.singers.trim()) || (payload.songs && payload.songs.length > 0)) {
+  if (
+    (payload.singers && payload.singers.trim()) ||
+    (payload.leader && payload.leader.trim()) ||
+    (payload.songs && payload.songs.length > 0)
+  ) {
+    const parts = [];
+    if (payload.leader && payload.leader.trim()) parts.push(`Responsável: ${payload.leader.trim()}`);
+    if (payload.singers && payload.singers.trim()) parts.push(`Cantores: ${payload.singers.trim()}`);
+    const combined = parts.join(' | ');
+
     finalNotes = JSON.stringify({
+      leader: (payload.leader || '').trim(),
       singers: (payload.singers || '').trim(),
+      combined_singers: combined,
       songs: payload.songs || []
     });
   } else if (payload.offering_data) {

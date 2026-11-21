@@ -37,6 +37,48 @@ function isSaturdayEvent(eventDate?: string, eventTitle?: string): boolean {
   return t.includes('sábado') || t.includes('sabado');
 }
 
+function formatPraiseTeam(leader?: string, singers?: string): string {
+  const parts = [];
+  if (leader && leader.trim()) {
+    parts.push(`Responsável: ${leader.trim()}`);
+  }
+  if (singers && singers.trim()) {
+    parts.push(`Cantores: ${singers.trim()}`);
+  }
+  return parts.join(' | ');
+}
+
+function parsePraiseTeam(rawSingers?: string, rawLeader?: string): { leader: string; singers: string } {
+  let leader = (rawLeader || '').trim();
+  let singers = (rawSingers || '').trim();
+
+  if (!leader && singers) {
+    if (singers.includes('Responsável:') || singers.includes('Equipe:') || singers.includes('Cantores:')) {
+      const segments = singers.split('|').map(s => s.trim());
+      let parsedLeader = '';
+      let parsedSingers = '';
+      for (const seg of segments) {
+        if (/^respons[aá]vel:/i.test(seg)) {
+          parsedLeader = seg.replace(/^respons[aá]vel:\s*/i, '').trim();
+        } else if (/^(equipe|cantores|vocal):/i.test(seg)) {
+          parsedSingers = seg.replace(/^(equipe|cantores|vocal):\s*/i, '').trim();
+        } else if (!parsedLeader) {
+          parsedLeader = seg;
+        } else if (!parsedSingers) {
+          parsedSingers = seg;
+        }
+      }
+      leader = parsedLeader;
+      singers = parsedSingers;
+    } else if (singers.toLowerCase().startsWith('responsável:')) {
+      leader = singers.replace(/^respons[aá]vel:\s*/i, '').trim();
+      singers = '';
+    }
+  }
+
+  return { leader, singers };
+}
+
 function PersonInputField({
   label,
   value,
@@ -177,6 +219,7 @@ export default function LiturgyInvitePage() {
 
   // Louvor Congregacional
   const [listSongs, setListSongs] = useState<string[]>(['', '', '']);
+  const [teamLeader, setTeamLeader] = useState('');
   const [teamSingers, setTeamSingers] = useState('');
 
   // Ofertas (Provai e Vede)
@@ -204,6 +247,7 @@ export default function LiturgyInvitePage() {
         let detectedList = isCongregationalPraise(res.item.title);
         let detectedOffering = isOfferingItem(res.item.title);
 
+        let initialLeader = '';
         let initialSingers = '';
         let initialSongs: string[] = ['', '', ''];
         let initialD1 = '';
@@ -216,16 +260,21 @@ export default function LiturgyInvitePage() {
             const parsed = JSON.parse(rawNotes);
             if (parsed.songs && Array.isArray(parsed.songs)) {
               detectedList = true;
-              initialSingers = parsed.singers || '';
+              const praise = parsePraiseTeam(parsed.singers, parsed.leader);
+              initialLeader = praise.leader;
+              initialSingers = praise.singers;
               initialSongs = parsed.songs.length > 0 ? parsed.songs : ['', '', ''];
+              initialObs = parsed.obs || '';
             } else if (parsed.type === 'offering' || parsed.diacono1 !== undefined || parsed.oracao !== undefined) {
               detectedOffering = true;
               initialD1 = parsed.diacono1 || '';
               initialD2 = parsed.diacono2 || '';
               initialOracao = parsed.oracao || '';
               initialObs = parsed.obs || '';
-            } else if (parsed.singers) {
-              initialSingers = parsed.singers;
+            } else if (parsed.singers || parsed.leader) {
+              const praise = parsePraiseTeam(parsed.singers, parsed.leader);
+              initialLeader = praise.leader;
+              initialSingers = praise.singers;
             }
           } catch (e) {
             initialObs = rawNotes;
@@ -234,8 +283,8 @@ export default function LiturgyInvitePage() {
           initialObs = rawNotes;
         }
 
-        if (detectedList && !initialSingers && res.item.responsible_person?.name) {
-          initialSingers = `Responsável: ${res.item.responsible_person.name}`;
+        if (detectedList && !initialLeader && res.item.responsible_person?.name) {
+          initialLeader = res.item.responsible_person.name;
         }
 
         if (detectedOffering && !initialD1 && res.item.responsible_person?.name) {
@@ -249,6 +298,7 @@ export default function LiturgyInvitePage() {
         setIsListMode(detectedList);
         setIsOfferingMode(detectedOffering);
 
+        setTeamLeader(initialLeader);
         setTeamSingers(initialSingers);
         setListSongs(initialSongs);
 
@@ -327,10 +377,15 @@ export default function LiturgyInvitePage() {
       } else if (isListMode) {
         // Louvores Congregacionais
         const validSongs = listSongs.map(s => s.trim());
-        const finalSingers = teamSingers.trim() || 'Equipe de Louvor';
+        if (!teamLeader.trim() && !teamSingers.trim()) {
+          alert('Por favor, informe pelo menos o responsável ou a equipe de cantores.');
+          setSaving(false);
+          return;
+        }
 
         await updateLiturgyItemPublic(itemId, {
-          singers: finalSingers,
+          leader: teamLeader.trim(),
+          singers: teamSingers.trim(),
           songs: validSongs,
           notes: customNotes.trim() || null
         });
@@ -434,8 +489,9 @@ export default function LiturgyInvitePage() {
                 </div>
               ) : isListMode ? (
                 <>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b', marginBottom: '8px' }}>
-                    🎤 {teamSingers || 'Equipe de Louvor'}
+                  <div style={{ fontSize: '0.9rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+                    {teamLeader && <div>👤 <strong>Responsável:</strong> {teamLeader}</div>}
+                    {teamSingers && <div>🎤 <strong>Cantores:</strong> {teamSingers}</div>}
                   </div>
                   <div style={{ fontSize: '0.88rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     {listSongs.filter(s => s && s.trim()).map((s, idx) => (
@@ -539,16 +595,34 @@ export default function LiturgyInvitePage() {
               ) : isListMode ? (
                 /* CENÁRIO 2: LOUVORES CONGREGACIONAIS */
                 <>
-                  {/* Cantores / Equipe que vai puxar */}
+                  <div style={{ marginBottom: '16px', background: '#eef2ff', padding: '12px', borderRadius: '8px', border: '1px solid #c7d2fe' }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#3730a3', marginBottom: '2px' }}>
+                      🎼 Louvores Congregacionais:
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#4338ca' }}>
+                      Defina o responsável pelo momento, os cantores que vão puxar os hinos e a lista dos hinos.
+                    </div>
+                  </div>
+
+                  {/* 1. Responsável pelo Louvor */}
+                  <PersonInputField
+                    label="1. 👤 Responsável pelo Louvor:"
+                    value={teamLeader}
+                    onChange={setTeamLeader}
+                    people={people}
+                    placeholder="Nome do responsável (ex: Maria Eduarda)..."
+                  />
+
+                  {/* 2. Cantores / Equipe que vai puxar */}
                   <div style={{ marginBottom: '18px' }}>
                     <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                      🎤 Cantores (Equipe que vai puxar os hinos):
+                      2. 🎤 Cantores (Equipe que vai puxar os hinos junto):
                     </label>
                     <input
                       type="text"
                       value={teamSingers}
                       onChange={(e) => setTeamSingers(e.target.value)}
-                      placeholder="Ex: Responsável: Maria Eduarda | Equipe: Lucas, Ana"
+                      placeholder="Ex: Lucas, Ana, Banda... (ou deixe em branco se cantar sozinho)"
                       style={{
                         width: '100%',
                         padding: '12px 14px',
@@ -556,13 +630,12 @@ export default function LiturgyInvitePage() {
                         border: '1px solid #cbd5e1',
                         fontSize: '0.95rem',
                         boxSizing: 'border-box',
-                        fontWeight: 600,
                         color: '#1e293b',
                         backgroundColor: '#ffffff'
                       }}
                     />
                     <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
-                      O responsável já está definido. Você pode adicionar outros cantores que estarão com você se desejar.
+                      Informe os cantores ou a equipe que estarão junto com o responsável puxando o louvor.
                     </div>
                   </div>
 
