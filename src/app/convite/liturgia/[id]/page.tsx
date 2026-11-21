@@ -11,16 +11,32 @@ function isCongregationalPraise(title: string): boolean {
   return t.includes('congregaciona') || t.includes('momento de louvor') || t.includes('cânticos') || t.includes('canticos');
 }
 
+function isFinalPraise(title: string): boolean {
+  const t = (title || '').toLowerCase();
+  return t.includes('louvor final') || t.includes('hino final');
+}
+
+function isSpecialPraiseItem(title: string): boolean {
+  const t = (title || '').toLowerCase();
+  if (isCongregationalPraise(t) || isFinalPraise(t) || t.includes('hino inicial')) return false;
+  return t.includes('solo') || 
+         t.includes('louvor especial') || 
+         t.includes('música especial') || 
+         t.includes('musica especial') || 
+         t.includes('mensagem musical');
+}
+
 function isMusicalItem(title: string): boolean {
   const t = (title || '').toLowerCase();
-  return isCongregationalPraise(t) || 
-         t.includes('louvor') || 
-         t.includes('cântico') || 
-         t.includes('cantico') || 
-         t.includes('música') || 
-         t.includes('musica') || 
-         t.includes('hino') || 
-         t.includes('solo');
+  return isCongregationalPraise(t) ||
+    isFinalPraise(t) ||
+    t.includes('louvor') ||
+    t.includes('cântico') ||
+    t.includes('cantico') ||
+    t.includes('música') ||
+    t.includes('musica') ||
+    t.includes('hino') ||
+    t.includes('solo');
 }
 
 function isOfferingItem(title: string): boolean {
@@ -37,10 +53,105 @@ function isSaturdayEvent(eventDate?: string, eventTitle?: string): boolean {
   return t.includes('sábado') || t.includes('sabado');
 }
 
+const CHURCH_NAME_OVERRIDES: Record<string, string> = {
+  'maria eduarda souza tomaz': 'Maria Eduarda',
+  'maria eduarda souza': 'Maria Eduarda',
+  'maria eduarda tomaz': 'Maria Eduarda',
+  'maria eduarda': 'Maria Eduarda',
+  'felipe emilio de quadros': 'Felipe Quadros',
+  'felipe emílio de quadros': 'Felipe Quadros',
+  'felipe de quadros': 'Felipe Quadros',
+  'felipe quadros': 'Felipe Quadros',
+  'carlos alberto cordeiro': 'Carlos Alberto',
+  'carlos alberto': 'Carlos Alberto',
+  'natan cappra de oliveira': 'Natan Cappra',
+  'natan cappra': 'Natan Cappra',
+  'dennis vinicius rodrigues de almeida': 'Dennis Vinicius',
+  'dennis vinicius': 'Dennis Vinicius',
+  'hiago augusto fortes': 'Hiago Fortes',
+  'alisson mateus ermel': 'Alisson Ermel',
+  'sheila de matos': 'Sheila de Matos',
+  'william de borba': 'William de Borba',
+  'rejane sueli da rosa': 'Rejane Sueli',
+  'tiago rodrigues da luz': 'Tiago Rodrigues',
+  'roger dos santos cordeiro': 'Roger Cordeiro',
+};
+
+function fixCapitalization(str: string): string {
+  const lowercaseWords = ['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o', 'em'];
+  return str
+    .split(/\s+/)
+    .map((word, idx) => {
+      const lower = word.toLowerCase();
+      if (idx > 0 && lowercaseWords.includes(lower)) {
+        return lower;
+      }
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(' ');
+}
+
+function formatName(name: string): string {
+  if (!name) return '';
+  const trimmed = name.trim();
+
+  // 1. Se tem ' e ' ou ' & ' (casais, duplas: ex: "Felipe e Aline")
+  if (/\s+(e|&)\s+/i.test(trimmed)) {
+    return fixCapitalization(trimmed);
+  }
+
+  // 2. Se for grupo, banda, trio, ministério, coral, equipe, etc.
+  const groupPattern = /^(trio|grupo|banda|quarteto|coral|equipe|minist[eé]rio|conjunto|fam[ií]lia|dupla|jovens|professores|professor|pastores|pastor|anci[aã]os|anci[aã]o|di[aá]conos|diaconisas|desbravadores|aventureiros)\b/i;
+  if (groupPattern.test(trimmed)) {
+    return fixCapitalization(trimmed);
+  }
+
+  // 3. Override direto da igreja
+  const lowerKey = trimmed.toLowerCase();
+  if (CHURCH_NAME_OVERRIDES[lowerKey]) {
+    return CHURCH_NAME_OVERRIDES[lowerKey];
+  }
+
+  const parts = trimmed.split(/\s+/);
+  if (parts.length <= 1) return fixCapitalization(trimmed);
+
+  const prepositions = ['de', 'da', 'do', 'das', 'dos'];
+  const firstLower = parts[0].toLowerCase();
+  const secondLower = parts[1].toLowerCase();
+
+  // 4. Início de nome composto (ex: Maria Eduarda, Carlos Alberto, Dennis Vinicius)
+  const COMPOUND_STARTERS = [
+    'maria', 'ana', 'joão', 'joao', 'josé', 'jose', 'carlos', 'luiz', 'luís', 'luis',
+    'pedro', 'paulo', 'dennis', 'denis', 'bruna', 'victor', 'vitor', 'marcos', 'marcus',
+    'clara', 'laura', 'sophia', 'sofia', 'alice', 'beatriz', 'rejane'
+  ];
+  if (COMPOUND_STARTERS.includes(firstLower) && !prepositions.includes(secondLower)) {
+    return fixCapitalization(`${parts[0]} ${parts[1]}`);
+  }
+
+  // 5. Nome do meio (ex: Felipe Emilio de Quadros -> Felipe Quadros)
+  const MIDDLE_GIVEN_NAMES = [
+    'emilio', 'emílio', 'augusto', 'mateus', 'matheus', 'eduardo', 'henrique',
+    'gabriel', 'alexandre', 'fernando', 'guilherme', 'felipe', 'vinicius', 'vinícius'
+  ];
+  if (parts.length >= 3 && MIDDLE_GIVEN_NAMES.includes(secondLower)) {
+    const lastWord = parts[parts.length - 1];
+    return fixCapitalization(`${parts[0]} ${lastWord}`);
+  }
+
+  // 6. Preposição no segundo termo (ex: Sheila de Matos, William de Borba)
+  if (prepositions.includes(secondLower) && parts.length >= 3) {
+    return fixCapitalization(`${parts[0]} ${parts[1]} ${parts[2]}`);
+  }
+
+  // 7. Padrão: Primeiro Nome + Primeiro Sobrenome
+  return fixCapitalization(`${parts[0]} ${parts[1]}`);
+}
+
 function formatPraiseTeam(leader?: string, singers?: string): string {
   const parts = [];
   if (leader && leader.trim()) {
-    parts.push(`Responsável: ${leader.trim()}`);
+    parts.push(`Responsável: ${formatName(leader.trim())}`);
   }
   if (singers && singers.trim()) {
     parts.push(`Cantores: ${singers.trim()}`);
@@ -107,7 +218,7 @@ function PersonInputField({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filtered = people.filter(p => 
+  const filtered = people.filter(p =>
     p.name.toLowerCase().includes(value.toLowerCase().trim())
   );
 
@@ -244,12 +355,13 @@ export default function LiturgyInvitePage() {
         setPeople(res.people || []);
 
         const rawNotes = res.item.notes || '';
-        let detectedList = isCongregationalPraise(res.item.title);
+        const isFinal = isFinalPraise(res.item.title);
+        let detectedList = isCongregationalPraise(res.item.title) || isFinal;
         let detectedOffering = isOfferingItem(res.item.title);
 
         let initialLeader = '';
         let initialSingers = '';
-        let initialSongs: string[] = ['', '', ''];
+        let initialSongs: string[] = isFinal ? [''] : ['', '', ''];
         let initialD1 = '';
         let initialD2 = '';
         let initialOracao = '';
@@ -261,19 +373,23 @@ export default function LiturgyInvitePage() {
             if (parsed.songs && Array.isArray(parsed.songs)) {
               detectedList = true;
               const praise = parsePraiseTeam(parsed.singers, parsed.leader);
-              initialLeader = praise.leader;
+              initialLeader = formatName(praise.leader);
               initialSingers = praise.singers;
-              initialSongs = parsed.songs.length > 0 ? parsed.songs : ['', '', ''];
+              if (isFinal) {
+                initialSongs = parsed.songs.length > 0 && parsed.songs[0]?.trim() ? [parsed.songs[0]] : [''];
+              } else {
+                initialSongs = parsed.songs.length > 0 ? parsed.songs : ['', '', ''];
+              }
               initialObs = parsed.obs || '';
             } else if (parsed.type === 'offering' || parsed.diacono1 !== undefined || parsed.oracao !== undefined) {
               detectedOffering = true;
-              initialD1 = parsed.diacono1 || '';
-              initialD2 = parsed.diacono2 || '';
-              initialOracao = parsed.oracao || '';
+              initialD1 = formatName(parsed.diacono1 || '');
+              initialD2 = formatName(parsed.diacono2 || '');
+              initialOracao = formatName(parsed.oracao || '');
               initialObs = parsed.obs || '';
             } else if (parsed.singers || parsed.leader) {
               const praise = parsePraiseTeam(parsed.singers, parsed.leader);
-              initialLeader = praise.leader;
+              initialLeader = formatName(praise.leader);
               initialSingers = praise.singers;
             }
           } catch (e) {
@@ -284,15 +400,19 @@ export default function LiturgyInvitePage() {
         }
 
         if (detectedList && !initialLeader && res.item.responsible_person?.name) {
-          initialLeader = res.item.responsible_person.name;
+          initialLeader = formatName(res.item.responsible_person.name);
         }
 
         if (detectedOffering && !initialD1 && res.item.responsible_person?.name) {
-          initialD1 = res.item.responsible_person.name;
+          initialD1 = formatName(res.item.responsible_person.name);
         }
 
-        while (initialSongs.length < 3) {
-          initialSongs.push('');
+        if (!isFinal) {
+          while (initialSongs.length < 3) {
+            initialSongs.push('');
+          }
+        } else {
+          if (initialSongs.length === 0) initialSongs = [''];
         }
 
         setIsListMode(detectedList);
@@ -446,10 +566,10 @@ export default function LiturgyInvitePage() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f1f5f9', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 16px 60px 16px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      
+
       {/* Container Central */}
       <div style={{ maxWidth: '500px', width: '100%' }}>
-        
+
         {/* Cabeçalho da Igreja */}
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '56px', height: '56px', borderRadius: '16px', backgroundColor: '#4f46e5', color: 'white', fontSize: '1.6rem', marginBottom: '12px', boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)' }}>
@@ -477,10 +597,10 @@ export default function LiturgyInvitePage() {
                 <>Muito obrigado! O responsável por <strong>{item.title}</strong> foi registrado com sucesso na agenda do <strong>{event?.title || 'Culto'}</strong>.</>
               )}
             </p>
-            
+
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0', textAlign: 'left', marginBottom: '24px' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: '6px' }}>Resumo da escala</div>
-              
+
               {isOfferingMode ? (
                 <div style={{ fontSize: '0.9rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   {diacono1 && <div><strong>Diácono 1:</strong> {diacono1}</div>}
@@ -512,8 +632,8 @@ export default function LiturgyInvitePage() {
               {customNotes && <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '6px', fontStyle: 'italic' }}>💬 "{customNotes}"</div>}
             </div>
 
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => setSuccess(false)}
               style={{ background: 'transparent', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '10px 20px', fontSize: '0.85rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
             >
@@ -523,7 +643,7 @@ export default function LiturgyInvitePage() {
         ) : (
           /* Formulário de Preenchimento */
           <div style={{ background: '#ffffff', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
-            
+
             {/* Bloco de Destaque do Evento e Item */}
             <div style={{ background: '#f8fafc', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
@@ -532,7 +652,7 @@ export default function LiturgyInvitePage() {
               <div style={{ fontSize: '0.9rem', color: '#475569', fontWeight: 600, marginBottom: '10px' }}>
                 📅 {event?.date ? formatDateLong(event.date) : ''}
               </div>
-              
+
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '10px' }}>
                 <div>
                   <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', fontWeight: 600 }}>PARTE DA LITURGIA:</span>
@@ -559,8 +679,8 @@ export default function LiturgyInvitePage() {
                       💰 Escala de Dízimos e Ofertas ({isSaturday ? 'Sábado' : 'Culto Regular'}):
                     </div>
                     <div style={{ fontSize: '0.75rem', color: '#15803d' }}>
-                      {isSaturday 
-                        ? 'No sábado, escalam-se 2 diáconos para recolher e 1 pessoa para fazer a oração.' 
+                      {isSaturday
+                        ? 'No sábado, escalam-se 2 diáconos para recolher e 1 pessoa para fazer a oração.'
                         : 'No domingo/quarta, 1 ou 2 pessoas fazem o recolhimento e a oração.'}
                     </div>
                   </div>
@@ -643,7 +763,7 @@ export default function LiturgyInvitePage() {
                   <div style={{ marginBottom: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                       <label style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1e293b' }}>
-                        🎼 Hinos (normalmente 2 a 3 hinos):
+                        {isFinalPraise(item?.title) ? '🎼 Hino Final de Encerramento (1 hino após o sermão):' : '🎼 Hinos (normalmente 2 a 3 hinos):'}
                       </label>
                       <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 600 }}>
                         {listSongs.filter(s => s && s.trim()).length} hino(s) informado(s)
@@ -653,8 +773,8 @@ export default function LiturgyInvitePage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                       {listSongs.map((song, sIdx) => (
                         <div key={sIdx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <div style={{ width: '60px', fontSize: '0.82rem', fontWeight: 700, color: '#4f46e5', flexShrink: 0 }}>
-                            Hino {sIdx + 1}:
+                          <div style={{ width: isFinalPraise(item?.title) ? '80px' : '60px', fontSize: '0.82rem', fontWeight: 700, color: '#4f46e5', flexShrink: 0 }}>
+                            {isFinalPraise(item?.title) ? 'Hino Final:' : `Hino ${sIdx + 1}:`}
                           </div>
                           <input
                             type="text"
@@ -671,7 +791,7 @@ export default function LiturgyInvitePage() {
                               boxSizing: 'border-box'
                             }}
                           />
-                          {listSongs.length > 2 && (
+                          {!isFinalPraise(item?.title) && listSongs.length > 2 && (
                             <button
                               type="button"
                               onClick={() => handleRemoveSong(sIdx)}
@@ -692,26 +812,28 @@ export default function LiturgyInvitePage() {
                       ))}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={handleAddSong}
-                      style={{
-                        marginTop: '10px',
-                        background: 'none',
-                        border: '1px dashed #4f46e5',
-                        borderRadius: '6px',
-                        padding: '6px 14px',
-                        fontSize: '0.8rem',
-                        fontWeight: 700,
-                        color: '#4f46e5',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
-                    >
-                      + Adicionar Hino
-                    </button>
+                    {!isFinalPraise(item?.title) && (
+                      <button
+                        type="button"
+                        onClick={handleAddSong}
+                        style={{
+                          marginTop: '10px',
+                          background: 'none',
+                          border: '1px dashed #4f46e5',
+                          borderRadius: '6px',
+                          padding: '6px 14px',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          color: '#4f46e5',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        + Adicionar Hino
+                      </button>
+                    )}
                   </div>
                 </>
               ) : (
@@ -759,8 +881,8 @@ export default function LiturgyInvitePage() {
                         💬 Observações ou pedido especial (opcional):
                       </label>
                       {!customNotes.trim() && (
-                        <button 
-                          type="button" 
+                        <button
+                          type="button"
                           onClick={() => setShowNotesField(false)}
                           style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.75rem', cursor: 'pointer' }}
                         >
@@ -832,8 +954,8 @@ export default function LiturgyInvitePage() {
               >
                 {saving ? 'Salvando...' : (
                   isOfferingMode ? '✅ Confirmar Escala de Ofertas' :
-                  isListMode ? '✅ Salvar Hinos e Confirmar' :
-                  '✅ Confirmar Participação'
+                    isListMode ? '✅ Salvar Hinos e Confirmar' :
+                      '✅ Confirmar Participação'
                 )}
               </button>
             </form>

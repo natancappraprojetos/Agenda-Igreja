@@ -42,6 +42,30 @@ function fixCapitalization(str: string): string {
     .join(' ');
 }
 
+const CHURCH_NAME_OVERRIDES: Record<string, string> = {
+  'maria eduarda souza tomaz': 'Maria Eduarda',
+  'maria eduarda souza': 'Maria Eduarda',
+  'maria eduarda tomaz': 'Maria Eduarda',
+  'maria eduarda': 'Maria Eduarda',
+  'felipe emilio de quadros': 'Felipe Quadros',
+  'felipe emílio de quadros': 'Felipe Quadros',
+  'felipe de quadros': 'Felipe Quadros',
+  'felipe quadros': 'Felipe Quadros',
+  'carlos alberto cordeiro': 'Carlos Alberto',
+  'carlos alberto': 'Carlos Alberto',
+  'natan cappra de oliveira': 'Natan Cappra',
+  'natan cappra': 'Natan Cappra',
+  'dennis vinicius rodrigues de almeida': 'Dennis Vinicius',
+  'dennis vinicius': 'Dennis Vinicius',
+  'hiago augusto fortes': 'Hiago Fortes',
+  'alisson mateus ermel': 'Alisson Ermel',
+  'sheila de matos': 'Sheila de Matos',
+  'william de borba': 'William de Borba',
+  'rejane sueli da rosa': 'Rejane Sueli',
+  'tiago rodrigues da luz': 'Tiago Rodrigues',
+  'roger dos santos cordeiro': 'Roger Cordeiro',
+};
+
 function formatName(name: string): string {
   if (!name) return '';
   const trimmed = name.trim();
@@ -57,43 +81,46 @@ function formatName(name: string): string {
     return fixCapitalization(trimmed);
   }
 
+  // 3. Override direto da igreja
+  const lowerKey = trimmed.toLowerCase();
+  if (CHURCH_NAME_OVERRIDES[lowerKey]) {
+    return CHURCH_NAME_OVERRIDES[lowerKey];
+  }
+
   const parts = trimmed.split(/\s+/);
+  if (parts.length <= 1) return fixCapitalization(trimmed);
 
-  // 3. Se tiver até 3 palavras (ex: 'Sheila de Matos', 'Darci de Jesus', 'Ana Paula Souza') -> nunca cortar!
-  if (parts.length <= 3) {
-    return fixCapitalization(trimmed);
+  const prepositions = ['de', 'da', 'do', 'das', 'dos'];
+  const firstLower = parts[0].toLowerCase();
+  const secondLower = parts[1].toLowerCase();
+
+  // 4. Início de nome composto (ex: Maria Eduarda, Carlos Alberto, Dennis Vinicius, Ana Paula) -> apenas nome composto!
+  const COMPOUND_STARTERS = [
+    'maria', 'ana', 'joão', 'joao', 'josé', 'jose', 'carlos', 'luiz', 'luís', 'luis',
+    'pedro', 'paulo', 'dennis', 'denis', 'bruna', 'victor', 'vitor', 'marcos', 'marcus',
+    'clara', 'laura', 'sophia', 'sofia', 'alice', 'beatriz', 'rejane'
+  ];
+  if (COMPOUND_STARTERS.includes(firstLower) && !prepositions.includes(secondLower)) {
+    return fixCapitalization(`${parts[0]} ${parts[1]}`);
   }
 
-  // 4. Se tiver 4 ou mais palavras, mas for curto (até 26 caracteres), mantém inteiro
-  if (trimmed.length <= 26) {
-    return fixCapitalization(trimmed);
+  // 5. Nome do meio (ex: Felipe Emilio de Quadros -> Felipe Quadros)
+  const MIDDLE_GIVEN_NAMES = [
+    'emilio', 'emílio', 'augusto', 'mateus', 'matheus', 'eduardo', 'henrique',
+    'gabriel', 'alexandre', 'fernando', 'guilherme', 'felipe', 'vinicius', 'vinícius'
+  ];
+  if (parts.length >= 3 && MIDDLE_GIVEN_NAMES.includes(secondLower)) {
+    const lastWord = parts[parts.length - 1];
+    return fixCapitalization(`${parts[0]} ${lastWord}`);
   }
 
-  const prepositions = ['de', 'da', 'do', 'das', 'dos', 'e'];
-  const firstName = parts[0];
-  const secondName = parts[1];
-
-  // Nome composto tradicional (ex: João Pedro, Ana Paula, Maria Eduarda)
-  const compoundFirst = ['pedro', 'paulo', 'maria', 'eduarda', 'clara', 'paula', 'luiza', 'luiz', 'lucas', 'vitor', 'victor', 'felipe', 'gabriel', 'henrique', 'guilherme', 'arthur', 'miguel', 'alice', 'beatriz', 'sophia', 'laura', 'valentina'];
-  const hasCompound = compoundFirst.includes(secondName.toLowerCase()) && !prepositions.includes(secondName.toLowerCase());
-
-  const prefix = hasCompound ? `${firstName} ${secondName}` : firstName;
-
-  const lastIndex = parts.length - 1;
-  const lastWord = parts[lastIndex];
-  const secondToLast = parts[lastIndex - 1];
-
-  let suffix = lastWord;
-  // Se antes do último houver preposição (ex: 'dos Santos', 'de Matos'), preserva junto
-  if (secondToLast && prepositions.includes(secondToLast.toLowerCase())) {
-    suffix = `${secondToLast} ${lastWord}`;
+  // 6. Preposição no segundo termo (ex: Sheila de Matos, William de Borba)
+  if (prepositions.includes(secondLower) && parts.length >= 3) {
+    return fixCapitalization(`${parts[0]} ${parts[1]} ${parts[2]}`);
   }
 
-  if (prefix.toLowerCase().includes(lastWord.toLowerCase())) {
-    return fixCapitalization(prefix);
-  }
-
-  return fixCapitalization(`${prefix} ${suffix}`);
+  // 7. Padrão: Primeiro Nome + Primeiro Sobrenome (ex: Natan Cappra de Oliveira -> Natan Cappra)
+  return fixCapitalization(`${parts[0]} ${parts[1]}`);
 }
 
 function isCongregationalPraise(title: string): boolean {
@@ -101,9 +128,25 @@ function isCongregationalPraise(title: string): boolean {
   return t.includes('congregaciona') || t.includes('momento de louvor') || t.includes('cânticos') || t.includes('canticos');
 }
 
+function isFinalPraise(title: string): boolean {
+  const t = (title || '').toLowerCase();
+  return t.includes('louvor final') || t.includes('hino final');
+}
+
+function isSpecialPraiseItem(title: string): boolean {
+  const t = (title || '').toLowerCase();
+  if (isCongregationalPraise(t) || isFinalPraise(t) || t.includes('hino inicial')) return false;
+  return t.includes('solo') || 
+         t.includes('louvor especial') || 
+         t.includes('música especial') || 
+         t.includes('musica especial') || 
+         t.includes('mensagem musical');
+}
+
 function isMusicalItem(title: string): boolean {
   const t = (title || '').toLowerCase();
   return isCongregationalPraise(t) || 
+         isFinalPraise(t) ||
          t.includes('louvor') || 
          t.includes('cântico') || 
          t.includes('cantico') || 
@@ -130,7 +173,7 @@ function isSaturdayEvent(eventDate?: string, eventTitle?: string): boolean {
 function formatPraiseTeam(leader?: string, singers?: string): string {
   const parts = [];
   if (leader && leader.trim()) {
-    parts.push(`Responsável: ${leader.trim()}`);
+    parts.push(`Responsável: ${formatName(leader.trim())}`);
   }
   if (singers && singers.trim()) {
     parts.push(`Cantores: ${singers.trim()}`);
@@ -172,14 +215,41 @@ function parsePraiseTeam(rawSingers?: string, rawLeader?: string): { leader: str
 function formatOfferingNames(data?: { diacono1?: string; diacono2?: string; oracao?: string }): string {
   if (!data) return '';
   const parts = [];
-  const diaconos = [data.diacono1, data.diacono2].filter(Boolean).map(n => n!.trim()).filter(Boolean);
+  const diaconos = [data.diacono1, data.diacono2].filter(Boolean).map(n => formatName(n!.trim())).filter(Boolean);
   if (diaconos.length > 0) {
     parts.push(diaconos.length === 1 ? `Recolhe: ${diaconos[0]}` : `Recolhem: ${diaconos.join(' e ')}`);
   }
   if (data.oracao && data.oracao.trim()) {
-    parts.push(`Oração: ${data.oracao.trim()}`);
+    parts.push(`Oração: ${formatName(data.oracao.trim())}`);
   }
   return parts.join(' | ');
+}
+
+function syncFinalPraiseWithSpecialPraise(itemsList: LocalLiturgyItem[]): LocalLiturgyItem[] {
+  const hasActiveSpecialPraise = itemsList.some(it => isSpecialPraiseItem(it.title) && !isNoOne(it));
+  const congItem = itemsList.find(it => isCongregationalPraise(it.title));
+  const congLeader = congItem?.list_data?.leader || '';
+  const congSingers = congItem?.list_data?.singers || '';
+
+  return itemsList.map(it => {
+    if (!isFinalPraise(it.title)) return it;
+    if (!hasActiveSpecialPraise) {
+      const existingSongs = it.list_data?.songs || [];
+      const singleSong = existingSongs.length > 0 && existingSongs[0]?.trim() ? [existingSongs[0]] : [''];
+      return {
+        ...it,
+        is_list: true,
+        person_id: null,
+        person_name: '',
+        list_data: {
+          leader: it.list_data?.leader || congLeader,
+          singers: it.list_data?.singers || congSingers,
+          songs: singleSong,
+        }
+      };
+    }
+    return it;
+  });
 }
 
 export const isNoOne = (item: LocalLiturgyItem) => {
@@ -388,13 +458,15 @@ export default function LiturgyBuilderPage() {
 
             if (isList) {
               if (!listData.leader && pName) {
-                listData.leader = pName;
+                listData.leader = formatName(pName);
               }
               if (!listData.leader) {
                 const leaderName = findPerson(['Líder de Louvor', 'Música'])?.name || evData.worship_leader?.name;
                 if (leaderName) {
-                  listData.leader = leaderName.split(' ')[0];
+                  listData.leader = formatName(leaderName);
                 }
+              } else {
+                listData.leader = formatName(listData.leader);
               }
               if (!listData.singers) {
                 const teamNamesFull = evData.participants?.filter((p: any) => {
@@ -442,7 +514,8 @@ export default function LiturgyBuilderPage() {
               calculated_time: i.calculated_time
             };
           });
-          setItems(calculateLiturgyTimes(mapped, litData.start_time) as LocalLiturgyItem[]);
+          const synced = syncFinalPraiseWithSpecialPraise(mapped);
+          setItems(calculateLiturgyTimes(synced, litData.start_time) as LocalLiturgyItem[]);
           setLoading(false);
           return;
         }
@@ -711,7 +784,7 @@ export default function LiturgyBuilderPage() {
       let listData = { leader: '', singers: '', songs: ['', ''] };
       if (isList) {
         const leaderNameFull = findPeopleNames(['Líder de Louvor', 'Música']) || ev.worship_leader?.name;
-        const leaderName = leaderNameFull ? leaderNameFull.split(' ')[0] : '';
+        const leaderName = leaderNameFull ? formatName(leaderNameFull) : '';
 
         const teamNamesFull = ev.participants?.filter((p: any) => {
           const rn = p.role?.name?.toLowerCase() || '';
@@ -752,7 +825,8 @@ export default function LiturgyBuilderPage() {
       };
     });
 
-    const calculated = calculateLiturgyTimes(newItems, ev.start_time) as LocalLiturgyItem[];
+    const synced = syncFinalPraiseWithSpecialPraise(newItems);
+    const calculated = calculateLiturgyTimes(synced, ev.start_time) as LocalLiturgyItem[];
     setItems(calculated);
 
     // Save to DB silently
@@ -924,8 +998,13 @@ export default function LiturgyBuilderPage() {
 
   const removeItem = (index: number) => {
     const newItems = [...items];
+    const removedItem = newItems[index];
     newItems.splice(index, 1);
-    const calculated = calculateLiturgyTimes(newItems, event.start_time) as LocalLiturgyItem[];
+    let updated = newItems;
+    if (isSpecialPraiseItem(removedItem.title)) {
+      updated = syncFinalPraiseWithSpecialPraise(updated);
+    }
+    const calculated = calculateLiturgyTimes(updated, event.start_time) as LocalLiturgyItem[];
     setItems(calculated);
   };
 
@@ -952,7 +1031,11 @@ export default function LiturgyBuilderPage() {
         person_name: noOne ? 'Não haverá' : ''
       };
     }
-    const calculated = calculateLiturgyTimes(newItems, event.start_time) as LocalLiturgyItem[];
+    let updated = newItems;
+    if (isSpecialPraiseItem(item.title)) {
+      updated = syncFinalPraiseWithSpecialPraise(updated);
+    }
+    const calculated = calculateLiturgyTimes(updated, event.start_time) as LocalLiturgyItem[];
     setItems(calculated);
   };
 
@@ -983,8 +1066,12 @@ export default function LiturgyBuilderPage() {
 
   const copyToWhatsApp = () => {
     const header = `*Liturgia do Culto de ${event.title} – ${formatDateShort(event.date)}*\n`;
-    const soundFirstName = event.sound_person?.name ? event.sound_person.name.split(' ')[0] : '';
-    const sound = soundFirstName ? `🖥️ Sonoplastia: ${soundFirstName}\n\n` : `🖥️ Sonoplastia: ---\n\n`;
+    const soundPersonName = event.sound_person?.name
+      ? formatName(event.sound_person.name)
+      : (event.participants?.find((p: any) => p.role?.name?.toLowerCase().includes('sonoplasta'))?.person?.name
+        ? formatName(event.participants.find((p: any) => p.role?.name?.toLowerCase().includes('sonoplasta')).person.name)
+        : '');
+    const sound = soundPersonName ? `🖥️ Sonoplastia: ${soundPersonName}\n\n` : `🖥️ Sonoplastia: ---\n\n`;
 
     const body = items.map(item => {
       // Determine emoji fallback based on text
@@ -1479,7 +1566,7 @@ export default function LiturgyBuilderPage() {
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginBottom: '6px' }}>
                         <span style={{ fontSize: '0.82rem', fontWeight: 700, color: isPending ? 'var(--danger-dark, #b91c1c)' : 'var(--text)' }}>
-                          🎼 Louvor Congregacional (Responsável + Cantores):
+                          {isFinalPraise(item.title) ? '🎼 Louvor Final (Responsável + Cantores):' : '🎼 Louvor Congregacional (Responsável + Cantores):'}
                         </span>
                         {item.id && (
                           <button
@@ -1534,26 +1621,30 @@ export default function LiturgyBuilderPage() {
                       </div>
 
                       <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
-                        Hinos (normalmente 2 hinos):
+                        {isFinalPraise(item.title) ? 'Hino Final (1 hino de encerramento após o sermão):' : 'Hinos (normalmente 2 a 3 hinos):'}
                       </label>
-                      {(item.list_data?.songs || []).map((song, sIdx) => (
+                      {(item.list_data?.songs && item.list_data.songs.length > 0 ? item.list_data.songs : ['']).map((song, sIdx) => (
                         <div key={sIdx} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                           <div style={{ flex: 1 }}>
                             <input 
                               type="text" 
                               className="form-input form-input-sm" 
-                              placeholder={`Hino ${sIdx + 1} (ex: Vem Espírito Santo - 585 NHA)`} 
+                              placeholder={isFinalPraise(item.title) ? 'Hino Final (ex: Vem Espírito Santo - 585 NHA)' : `Hino ${sIdx + 1} (ex: Vem Espírito Santo - 585 NHA)`} 
                               value={song} 
                               onChange={e => handleUpdateListSong(idx, sIdx, e.target.value)}
                               style={{ fontSize: '0.85rem' }}
                             />
                           </div>
-                          <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px', color: 'var(--text-danger)' }} onClick={() => handleRemoveListSong(idx, sIdx)} title="Remover este hino">✖</button>
+                          {!isFinalPraise(item.title) && (
+                            <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '4px', color: 'var(--text-danger)' }} onClick={() => handleRemoveListSong(idx, sIdx)} title="Remover este hino">✖</button>
+                          )}
                         </div>
                       ))}
-                      <button type="button" className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start', fontSize: '0.8rem', color: 'var(--primary)' }} onClick={() => handleAddListSong(idx)}>
-                        + Adicionar Hino
-                      </button>
+                      {!isFinalPraise(item.title) && (
+                        <button type="button" className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start', fontSize: '0.8rem', color: 'var(--primary)' }} onClick={() => handleAddListSong(idx)}>
+                          + Adicionar Hino
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <textarea
@@ -1637,7 +1728,7 @@ export default function LiturgyBuilderPage() {
             <div>
               <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>Sonoplastia do dia</div>
               <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>
-                {event.sound_person?.name || event.participants?.find((p: any) => p.role?.name?.toLowerCase().includes('sonoplasta'))?.person?.name || 'A Definir'}
+                {formatName(event.sound_person?.name || event.participants?.find((p: any) => p.role?.name?.toLowerCase().includes('sonoplasta'))?.person?.name || 'A Definir')}
               </div>
             </div>
           </div>
